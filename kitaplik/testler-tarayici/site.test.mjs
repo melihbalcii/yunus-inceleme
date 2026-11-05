@@ -1,5 +1,6 @@
-// Ön yüz: tarayıcı deposundan ve içe aktarılan dosyadan gelen veri (kalite/HATA-DEFTERI.md H-004).
-// Gerçek Chromium'da çalışır: zararlı veri sayfaya kod olarak girmemeli, kullanıcının gerçek verisi kaybolmamalı.
+// Ön yüz, gerçek Chromium'da: (1) tarayıcı deposundan ve içe aktarılan dosyadan gelen veri (kalite/HATA-DEFTERI.md
+// H-004): zararlı veri sayfaya kod olarak girmemeli, kullanıcının gerçek verisi kaybolmamalı; (2) kullanıcı akışları:
+// arama, eser sayfası eylemleri, verileri başka cihaza taşıma.
 // Çalıştırma: npm run test:tarayici  (Chromium: npx playwright install chromium)
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
@@ -14,7 +15,10 @@ const KOK = fileURLToPath(new URL("../public/", import.meta.url));
 const TUR = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json",
   ".svg": "image/svg+xml", ".png": "image/png", ".webp": "image/webp", ".jpg": "image/jpeg", ".webmanifest": "application/json" };
 const KATALOG = [{ id: "kisa-oyku", yol: "/ses/kisa-oyku-abc", no: 1, eser: "Kısa Öykü", yazar: "Yazar Bir", koken: "Rus",
-  ulke: "Rusya", sure: 1800, boyut: 1000, parcalar: [1800], ses: "Fola", tanitim: "", yazarBilgi: "", eklenme: "2026-11-01T10:00" }];
+  ulke: "Rusya", sure: 1800, boyut: 1000, parcalar: [1800], ses: "Fola", tanitim: "", yazarBilgi: "", eklenme: "2026-11-01T10:00" },
+  { id: "uzun-roman", yol: "/ses/uzun-roman-def", no: 2, eser: "Uzun Roman", yazar: "Yazar İki", koken: "Fransız", ulke: "Fransa",
+    sure: 36000, boyut: 2000, parcalar: [18000, 18000], ses: "Fola", tanitim: "Petersburg sokaklarında bir hayat.", yazarBilgi: "",
+    eklenme: "2026-11-03T10:00" }];
 
 // Kullanıcının gerçek, geçerli verisine benzer örnek: temizlikte hiçbir alanı değişmemeli.
 const GECERLI = {
@@ -81,7 +85,13 @@ async function sayfa(depo) {
   await p.coverage.startJSCoverage({ resetOnNavigation: false });
   const hatalar = [];
   p.on("pageerror", (h) => hatalar.push(String(h)));
-  if (depo !== undefined) await p.addInitScript((d) => localStorage.setItem("kitaplik-v1", JSON.stringify(d)), depo);
+  if (depo !== undefined) {  // yalnız ilk açılışta: sayfa yenilenince kullanıcının kaydettiği veri kalmalı
+    await p.addInitScript((d) => {
+      if (sessionStorage.getItem("ilk-acilis")) return;
+      sessionStorage.setItem("ilk-acilis", "1");
+      localStorage.setItem("kitaplik-v1", JSON.stringify(d));
+    }, depo);
+  }
   await p.goto(`${adres}/index.html`);
   await p.waitForFunction(() => document.querySelector("#icerik")?.innerHTML.length > 0);
   const kapat = async () => {
@@ -153,6 +163,64 @@ test("zararlı yedek dosyası içe aktarılınca kod çalışmaz, geçerli kısm
   assert.deepEqual(d.gunluk, { "2026-11-04": 600 });
   assert.equal(d.saatler[1], 30);
   assert.deepEqual(d.rozet, {});
+  assert.deepEqual(hatalar, []);
+  await kapat();
+});
+
+test("arama ada, yazara ve konuya göre süzer; sonuç yoksa söyler", async () => {
+  const { p, hatalar, kapat } = await sayfa({});
+  await p.evaluate(() => { location.hash = "#/ara"; });
+  await p.fill("#ara", "Roman");
+  await p.waitForFunction(() => document.querySelector("#ara-sonuc").textContent.includes("Uzun Roman"));
+  assert.ok(!(await p.textContent("#ara-sonuc")).includes("Kısa Öykü"));
+  await p.fill("#ara", "Yazar Bir");
+  await p.waitForFunction(() => document.querySelector("#ara-sonuc").textContent.includes("Kısa Öykü"));
+  await p.fill("#ara", "petersburg");  // yalnız tanıtımda geçiyor
+  await p.waitForFunction(() => document.querySelector("#ara-sonuc").textContent.includes("Konusunda geçenler"));
+  assert.ok((await p.textContent("#ara-sonuc")).includes("Uzun Roman"));
+  await p.fill("#ara", "böyle bir eser yok");
+  await p.waitForFunction(() => document.querySelector("#ara-sonuc").textContent.includes("sonuç yok"));
+  assert.deepEqual(hatalar, []);
+  await kapat();
+});
+
+test("eser sayfasında sonra dinle ve beğen kalıcıdır, ikinci tık geri alır", async () => {
+  const { p, hatalar, kapat } = await sayfa({});
+  await p.evaluate(() => { location.hash = "#/eser/uzun-roman"; });
+  await p.waitForSelector('[data-sonra="uzun-roman"]');
+  assert.equal(await p.textContent(".eser-bilgi h1"), "Uzun Roman");
+  await p.click('[data-sonra="uzun-roman"]');
+  await p.click('[data-begen="uzun-roman"]');
+  await p.waitForFunction(() => durum.sonra.includes("uzun-roman") && durum.begen["uzun-roman"]);
+  await p.reload();
+  await p.waitForSelector('[data-sonra="uzun-roman"].secili');
+  assert.deepEqual(await p.evaluate(() => [durum.sonra, Object.keys(durum.begen)]), [["uzun-roman"], ["uzun-roman"]]);
+  await p.click('[data-sonra="uzun-roman"]');
+  await p.waitForFunction(() => !durum.sonra.includes("uzun-roman"));
+  assert.deepEqual(hatalar, []);
+  await kapat();
+});
+
+test("verileri dışa aktarıp başka cihazda içe aktarmak dinleme geçmişini taşır", async () => {
+  const eski = await sayfa(GECERLI);
+  const [indirme] = await Promise.all([eski.p.waitForEvent("download"), eski.p.evaluate(() => disaAktar())]);
+  const icerik = await readFile(await indirme.path(), "utf-8");
+  assert.equal(JSON.parse(icerik).veri.indirilen, undefined, "indirilenler cihaza özeldir, taşınmamalı");
+  await eski.kapat();
+  const yeni = await sayfa({});
+  await yeni.p.evaluate((x) => iceAktar(new File([x], "yedek.json")), icerik);
+  await yeni.p.waitForFunction(() => durum.konum["kisa-oyku"] === 125);
+  const d = await yeni.p.evaluate(() => durum);
+  for (const alan of ["konum", "bitti", "imler", "begen", "sonra", "gunluk", "rozet"]) assert.deepEqual(d[alan], GECERLI[alan], alan);
+  assert.deepEqual(d.indirilen, {});
+  assert.deepEqual(yeni.hatalar, []);
+  await yeni.kapat();
+});
+
+test("olmayan eser sayfası siteyi düşürmez", async () => {
+  const { p, hatalar, kapat } = await sayfa({});
+  await p.evaluate(() => { location.hash = "#/eser/boyle-bir-eser-yok"; });
+  await p.waitForFunction(() => document.querySelector("#icerik").textContent.includes("Eser bulunamadı"));
   assert.deepEqual(hatalar, []);
   await kapat();
 });
