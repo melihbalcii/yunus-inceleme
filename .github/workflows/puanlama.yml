@@ -1,0 +1,117 @@
+# Bağımsız puanlama: her gönderimde bütün ölçümler çalışır, puan puanlama/PUANLAMA.md'deki formülle hesaplanır.
+# Puan "GEÇMEDİ" ise iş kırmızı biter. Ham çıktılar "puanlama-sonuclari" eki olarak indirilebilir.
+name: Puanlama
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: puanlama-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  puanlama:
+    runs-on: macos-latest   # üretim ortamı Apple Silicon Mac
+    timeout-minutes: 300
+    permissions:
+      contents: read
+      security-events: write   # CodeQL sonuçları Security sekmesine
+      actions: read
+    steps:
+      - uses: actions/checkout@v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: araclar/gereksinimler*.txt
+
+      - name: Python kütüphaneleri ve ölçüm araçları
+        run: python -m pip install -r araclar/gereksinimler.txt -r araclar/gereksinimler-olcum.txt
+
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: kitaplik/package-lock.json
+
+      - name: Node araçları ve Chromium
+        working-directory: kitaplik
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install chromium
+
+      - uses: denoland/setup-deno@v2.0.4
+
+      - name: CodeQL hazırlık
+        uses: github/codeql-action/init@v4.39.2
+        with:
+          languages: python, javascript-typescript
+          build-mode: none
+
+      - name: CodeQL tarama
+        uses: github/codeql-action/analyze@v4.39.2
+        with:
+          output: codeql-sonuc
+
+      - name: CodeQL yüksek/kritik bulgu sayısı
+        run: |
+          mkdir -p puanlama/sonuclar
+          python - <<'EOF'
+          import glob, json
+          yuksek = 0
+          for f in glob.glob("codeql-sonuc/*.sarif"):
+              s = json.load(open(f))
+              for run in s["runs"]:
+                  kural = {r["id"]: r for r in run["tool"]["driver"].get("rules", [])}
+                  for r in run.get("results", []):
+                      ciddiyet = float(kural.get(r["ruleId"], {}).get("properties", {}).get("security-severity", 0))
+                      yuksek += ciddiyet >= 7.0
+          json.dump({"yuksek": yuksek}, open("puanlama/sonuclar/codeql.json", "w"))
+          print("CodeQL yüksek/kritik:", yuksek)
+          EOF
+
+      - name: OpenSSF Scorecard
+        uses: ossf/scorecard-action@v2.4.4
+        with:
+          results_file: puanlama/sonuclar/scorecard.json
+          results_format: json
+          publish_results: false
+
+      - name: Ölçümler ve puan
+        env:
+          PY: python
+          DENO: deno
+        run: bash puanlama/olc.sh
+
+      - name: Özet
+        if: always()
+        run: |
+          python - >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          import json
+          try:
+              p = json.load(open("puanlama/sonuclar/puan.json"))
+          except OSError:
+              print("Puan hesaplanamadı."); raise SystemExit
+          print(f"## Puan: {p['toplam']} / 100 — {p['sonuc']}\n")
+          print("| Alan | Puan |\n|---|---|")
+          for a in p["alanlar"]:
+              print(f"| {a['ad']} | {a['puan']} / {a['agirlik']} |")
+          print("\n| Kesin şart | Durum |\n|---|---|")
+          for k in p["kesin"]:
+              print(f"| {k['ad']} | {'TUTTU' if k['durum'] else ('ÖLÇÜLMEDİ' if k['durum'] is None else 'TUTMADI')} {k['ek']} |")
+          EOF
+
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: puanlama-sonuclari
+          path: puanlama/sonuclar/
