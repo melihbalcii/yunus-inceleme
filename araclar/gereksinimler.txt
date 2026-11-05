@@ -1,7 +1,8 @@
-# Üretim sisteminin dış kütüphaneleri (Python 3.11). Sürümler çalışan ortamdan sabitlendi.
+# Üretim sisteminin dış kütüphaneleri (Python 3.11). torch 2.13: bilinen açığı olmayan ilk sürüm (H-007);
+# torchaudio 2.11.1 yalnız örnekleme dönüşümü ve SQUIM için (WAV okuma/yazma soundfile ile).
 numpy==1.26.4
-torch==2.6.0
-torchaudio==2.6.0
+torch==2.13.0
+torchaudio==2.11.1
 lameenc==1.9.0
 google-genai==2.32.0
 httpx==0.28.1

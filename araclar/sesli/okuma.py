@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Protocol
@@ -28,7 +29,8 @@ import numpy as np
 from . import metin as M
 from . import olcum
 from . import ses as S
-from .gemini import USLUP, BosYanit, GeciciHata, GuvenlikReddi, TTSHatasi, kota_gunu
+from .gemini import USLUP, BosYanit, GeciciHata, GuvenlikReddi, TTSHatasi
+from .kota import kota_gunu
 from .karsilastir import olcum as blok_olcumu
 from .yollar import Yollar
 
@@ -63,7 +65,7 @@ class OkumaAyari:
 
 
 def blok_ozeti(metin: str, model: str, ses: str) -> str:
-    return hashlib.md5(f"{metin}|{model}|{ses}|{USLUP}".encode()).hexdigest()[:12]
+    return hashlib.md5(f"{metin}|{model}|{ses}|{USLUP}".encode(), usedforsecurity=False).hexdigest()[:12]
 
 
 def blok_dosyasi(klasor: Path, metin: str, ayar: OkumaAyari) -> Path:
@@ -111,9 +113,22 @@ class DenemeDeposu:
                 veri = json.loads(self._kayit.read_text(encoding="utf-8"))
             except ValueError:
                 veri = {}
-        self.denemeler = [Deneme(**d) for d in veri.get("denemeler", []) if (klasor / d["dosya"]).exists()]
+        self.denemeler = [x for d in veri.get("denemeler", []) if (x := self._deneme(d)) is not None]
         self.istek = int(veri.get("istek", 0)) if veri.get("gun") == gun() else 0
         self.bolunecek = bool(veri.get("bolunecek"))  # model bu bloğa bütün olarak ses vermiyor: yarılarıyla okunur
+
+    def _deneme(self, d: object) -> Deneme | None:
+        """Kayıttaki bir denemeyi doğrular. Dosya adı kayıttan okunup açılıyor ve siliniyor: yalnız bu bloğun
+        "<özet>.deneme-N.wav" biçimindeki adı kabul edilir (CWE-22: "../" ile başka dosyaya ulaşılmasın)."""
+        if not isinstance(d, dict) or not isinstance(d.get("dosya"), str):
+            return None
+        if not re.fullmatch(rf"{re.escape(self.ozet)}\.deneme-\d{{1,2}}\.wav", d["dosya"]):
+            return None
+        try:
+            deneme = Deneme(d["dosya"], float(d["oran"]), [str(x) for x in d["eksik"]], float(d["bas"]), float(d["son"]))
+        except (KeyError, TypeError, ValueError):
+            return None
+        return deneme if (self.klasor / deneme.dosya).exists() else None
 
     def ses(self, d: Deneme) -> S.Dalga:
         return S.wav_oku(self.klasor / d.dosya)
@@ -267,11 +282,10 @@ class Okuyucu:
         par = M.paragraflar(yazi, self.ayar.siir)
         kimlik = dict(model=self.ayar.model, ses=self.ayar.ses, uslup=USLUP, paragraf=len(par),
                       karakter=sum(len(p.metin) for p in par))
-        kayit = json.loads(plan_dosyasi.read_text()) if plan_dosyasi.exists() else {}
-        eski = kayit.get("kimlik") or {}
+        eski, eski_sinirlar = self._plan_oku(plan_dosyasi, len(par))
         if eski.get("model") in self.ayar.ortak and {**eski, "model": self.ayar.model} == kimlik:
             kimlik = eski  # ortak aracın planı aynen sürer (sınırlar değişirse önbellekteki bloklar tutmaz)
-        sinirlar: list[int] = list(kayit.get("sinirlar", [])) if kayit.get("kimlik") == kimlik else []
+        sinirlar: list[int] = eski_sinirlar if eski == kimlik else []
         hizlar: list[float] = []
         bloklar: list[tuple[Path, str]] = []
         i = n = 0
@@ -293,6 +307,23 @@ class Okuyucu:
             bloklar.append((dosya, metin))
             i = j
         return bloklar
+
+    def _plan_oku(self, plan_dosyasi: Path, paragraf_sayisi: int) -> tuple[dict[str, Any], list[int]]:
+        """blok-plan.json'u doğrulayarak okur: (kimlik, sınırlar). Bozuk dosya programı düşürmez; uyarıyla yok sayılır."""
+        if not plan_dosyasi.exists():
+            return {}, []
+        try:
+            kayit = json.loads(plan_dosyasi.read_text())
+            kimlik, sinirlar = kayit.get("kimlik") or {}, kayit.get("sinirlar", [])
+            gecerli = (isinstance(kimlik, dict) and all(isinstance(v, (str, int)) for v in kimlik.values())
+                       and isinstance(sinirlar, list) and all(type(x) is int for x in sinirlar)
+                       and sinirlar == sorted(set(sinirlar)) and all(0 < x <= paragraf_sayisi for x in sinirlar))
+        except (OSError, ValueError, AttributeError):
+            gecerli = False
+        if not gecerli:
+            self.bildir(f"UYARI: {plan_dosyasi} bozuk, yok sayılıyor (blok sınırları yeniden hesaplanacak)")
+            return {}, []
+        return kimlik, sinirlar
 
     def _sabit(self, yazi: str) -> list[tuple[Path, str]]:
         metinler = M.sabit_bloklar(yazi, self.ayar.siir, self.ayar.sabit_blok)

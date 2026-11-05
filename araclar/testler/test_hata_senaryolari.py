@@ -5,6 +5,7 @@ Her test, ATILAN İSTEK SAYISINI doğrular: bir hata aynı işin arka planda iki
 """
 from __future__ import annotations
 
+import json
 import threading
 import time
 import unittest
@@ -183,6 +184,31 @@ class OkuyucuKotaTesti(GeciciKokTesti):
         ertesi = SahteTTS()
         self.okuyucu(ertesi, olc=lambda m, s: (0.99, []), gun="2026-11-06")._blok(tek, "[1]")
         self.assertEqual(ertesi.istekler, [tek])  # ertesi gün yeniden denendi ve okundu
+
+    def test_deneme_kaydindaki_yol_baska_dosyaya_ulasamaz(self):
+        """CWE-22: denemeler.json bozulur ya da kurcalanırsa "../" ile proje dışındaki bir dosya okunup silinmemeli."""
+        hedef = self.kok / "onemli.txt"
+        hedef.write_text("silinmemeli")
+        ozet = O.blok_ozeti(self.METIN, "m1", "Fola")
+        (self.y.parcalar / f"{ozet}.denemeler.json").write_text(json.dumps({"gun": "2026-11-05", "istek": 0, "denemeler": [
+            {"dosya": "../../onemli.txt", "oran": 0.99, "eksik": [], "bas": 3.6, "son": 3.5},
+            {"dosya": f"{ozet}.deneme-1.wav", "oran": "bozuk"}]}))
+        tts = SahteTTS()
+        self.okuyucu(tts, olc=lambda m, s: (0.99, []))._blok(self.METIN, "[1]")
+        self.assertEqual(hedef.read_text(), "silinmemeli")
+        self.assertEqual(len(tts.istekler), 1)  # kayıttaki sahte denemeler yok sayıldı, blok normal okundu
+
+    def test_bozuk_plan_dosyasi_okumayi_dusurmez(self):
+        metin = self.metin_yaz("kisa-oyku", [f"Paragraf {i}. " + "k" * 300 for i in range(4)])
+        cikti = self.y.fola_klasoru("kisa-oyku") / "kisa-oyku.mp3"
+        cikti.parent.mkdir(parents=True)
+        self.mesajlar: list[str] = []
+        for bozuk in ("{yarım", '{"kimlik": [], "sinirlar": "x"}', '{"kimlik": {}, "sinirlar": [3, 2, 99]}'):
+            (cikti.parent / "blok-plan.json").write_text(bozuk)
+            ok = O.Okuyucu(SahteTTS(), O.OkumaAyari("m1", "Fola", hedef_sn=60), self.y, bildir=self.mesajlar.append,
+                           olc=lambda m, s: (0.99, []), kalite=lambda s: (3.6, 3.5), yamala=lambda *a, **k: None)
+            ok.eseri_oku(metin, cikti)
+            self.assertTrue(any("bozuk" in m for m in self.mesajlar))
 
     def test_blok_basina_istek_tavani_hic_asilmaz(self):
         class HepKayip(SahteTTS):

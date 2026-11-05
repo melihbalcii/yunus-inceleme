@@ -26,7 +26,8 @@ from typing import Callable
 
 from . import olcum
 from .durum import SABIT, UYARLAMALI, Durum, DurumDeposu
-from .gemini import KOTA_SAAT_DILIMI, Arac
+from .gemini import Arac
+from .kota import KOTA_SAAT_DILIMI
 from .hazirlik import KuyrukIsi, kuyruk
 from .isci import Cikis, IsTanimi, calistir
 from .katalog import Katalog

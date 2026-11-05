@@ -57,7 +57,7 @@ def istek_ozeti(defter: Path, gun: str) -> dict[str, int]:
     """Kota günü `gun` içinde atılan isteklerin sonuçlarına göre sayısı ({"ses": 9, "kayip": 1, …})."""
     import datetime as dt
 
-    from .gemini import kota_gunu
+    from .kota import kota_gunu
     sayac: dict[str, int] = {}
     for k in oku(defter):
         try:

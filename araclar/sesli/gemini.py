@@ -23,14 +23,12 @@ import hashlib
 import io
 import json
 import re
-import datetime as dt
 import threading
 import time
 import wave
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, TypeVar
-from zoneinfo import ZoneInfo
 
 import numpy as np
 
@@ -48,7 +46,6 @@ EN_UZUN_BEKLEME = 45 * 60    # sn; aynı isteğin yanıtı en çok bu kadar bekl
 GITMEDI_DENEME = 3           # bağlanılamayan istek (kota harcanmaz) en çok bu kadar denenir
 DAKIKALIK_DENEME = 8         # dakikalık sınır (429, istek reddedilir, kota harcanmaz)
 VARSAYILAN_BUTCE = 2         # kotayı harcayabilecek istek: ilk istek + yanıtı kaybolursa bir tekrar
-KOTA_SAAT_DILIMI = ZoneInfo("America/Los_Angeles")  # günlük kota ABD Pasifik gece yarısı yenilenir
 
 
 class TTSHatasi(Exception):
@@ -94,11 +91,6 @@ class Arac:
     @property
     def klasor_adi(self) -> str:
         return self.ad.replace(" TTS", "")
-
-
-def kota_gunu(simdi: dt.datetime | None = None) -> str:
-    """Günlük kotanın hangi güne ait olduğu (ABD Pasifik tarihi, "2026-11-05")."""
-    return (simdi or dt.datetime.now().astimezone()).astimezone(KOTA_SAAT_DILIMI).date().isoformat()
 
 
 def istem(metin: str) -> str:
@@ -250,7 +242,7 @@ class GeminiTTS:
     def _yaz(self, metin: str, bas: float, sonuc: str, ses_sn: float | None = None) -> None:
         kayit: dict[str, Any] = {
             "zaman": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(bas)), "model": self.arac.model,
-            "kr": len(metin), "ozet": hashlib.md5(metin.encode()).hexdigest()[:12], "sonuc": sonuc,
+            "kr": len(metin), "ozet": hashlib.md5(metin.encode(), usedforsecurity=False).hexdigest()[:12], "sonuc": sonuc,
             "sn": round(self._saat() - bas, 1)}
         if ses_sn is not None:
             kayit["ses_sn"] = round(ses_sn, 1)

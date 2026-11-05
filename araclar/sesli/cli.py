@@ -43,7 +43,7 @@ def _durum(y: Yollar, _a: argparse.Namespace) -> int:
             durum += f"; kontrol %{kontrol.eslesme:.2f} {'geçti' if kontrol.gecti else 'GEÇMEDİ'}"
         print(f"{e.no:>3}  {e.eser[:42]:<42} {durum}")
     print("\nKuyruk (kısadan uzuna):", ", ".join(f"{i.ad} ({i.uzunluk:,} kr)" for i in kuyruk(k, y)) or "boş")
-    from .gemini import kota_gunu
+    from .kota import kota_gunu
     from .olcum import BOSA_GIDEN, istek_ozeti
     gun = kota_gunu()
     o = istek_ozeti(y.istek_defteri, gun)
