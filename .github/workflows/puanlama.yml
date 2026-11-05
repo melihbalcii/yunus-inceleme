@@ -64,6 +64,14 @@ jobs:
       - name: Python kütüphaneleri ve ölçüm araçları
         run: python -m pip install -r araclar/gereksinimler.txt -r araclar/gereksinimler-olcum.txt
 
+      - name: Toxiproxy (ağ kopması testi; sha256 doğrulanır)
+        run: |
+          mkdir -p .cache/toxiproxy
+          curl -fsSL -o .cache/toxiproxy/toxiproxy-server-darwin-arm64 \
+            https://github.com/Shopify/toxiproxy/releases/download/v2.12.0/toxiproxy-server-darwin-arm64
+          echo "aa299966b52f16a8594f1cd0d1e9049dc2e8fe2c04a90c19860e2719b2b95d15  .cache/toxiproxy/toxiproxy-server-darwin-arm64" | shasum -a 256 -c
+          chmod +x .cache/toxiproxy/toxiproxy-server-darwin-arm64
+
       - uses: actions/setup-node@v7.0.0
         with:
           node-version: "24"

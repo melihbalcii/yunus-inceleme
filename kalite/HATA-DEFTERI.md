@@ -18,9 +18,10 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
   ayrı yeniden deniyordu, denemeler çarpılıyordu.
 - **Neden kaçtı:** Testleri kodu yazan yazdı ve yalnız "her şey yolunda" durumunu sınadı. Kanıt okuma günlüğünde
   vardı, bakılmadı.
-- **Tür denetimi:** Hata senaryosu testleri (istek sayısını doğrular); planlı: rastgele senaryo (Hypothesis),
-  ağ arızası (Toxiproxy), canlı alarm.
-- **Durum:** Düzeltme gerçek projede yazılıyor, henüz doğrulanmadı.
+- **Tür denetimi:** Hata senaryosu testleri (istek sayısını doğrular); rastgele hata sırası (Hypothesis + başvuru
+  modeli, 400 senaryo); gerçek ağ arızası (Toxiproxy: ret, kopma, askı, yarım yanıt, gecikme — sunucuya ulaşan istek
+  sayılır); çökme testi (süreç öldürme); canlı alarm (bir kota gününde 4 istek boşa giderse okuma durur).
+- **Durum:** Düzeltildi; 6 Kasım'da gerçek projeye aktarıldı, okuma yeni kodla sürüyor.
 
 ### H-002 · Kota bitince okunmuş ses kayboluyor
 - **Bulan:** Okuma günlüğü (geriye dönük tarama), 5 Kasım 2026 · **Önem:** yüksek
