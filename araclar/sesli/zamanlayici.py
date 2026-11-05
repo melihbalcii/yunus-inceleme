@@ -45,6 +45,7 @@ HATA_BEKLEMESI = 600     # sn
 GECICI_BEKLEMESI = 600   # sn
 GECICI_SINIRI = 3        # üst üste bu kadar geçici sorunda araç kota yenilenene dek dinlenir
 ONARIM_SINIRI = 1
+ISRAF_SINIRI = 4         # bir kota gününde bu kadar istek ses getirmeden kota harcarsa okuma o gün durur (canlı alarm)
 
 # kazanç sırası (28 Ekim ölçümü). 3.1 uzun blokları güvenlikte reddediyor: kısa sabit blok, fırsat aracı.
 ARACLAR = (
@@ -161,6 +162,7 @@ class Bagimliliklar:
     simdi: Callable[[], dt.datetime]
     kayit: Callable[[str], None]
     hedef_sn: Callable[[str], int]
+    bosa_giden: Callable[[], int] = lambda: 0   # bugün kota harcayıp ses getirmeyen istek (istek defterinden)
 
 
 def gercek_bagimliliklar(yollar: Yollar) -> Bagimliliklar:
@@ -179,7 +181,15 @@ def gercek_bagimliliklar(yollar: Yollar) -> Bagimliliklar:
         katalog=lambda: Katalog.yukle(yollar), kuyruk=lambda k: kuyruk(k, yollar, hazirla=True, uyar=kayit),
         calistir=lambda is_: calistir(is_, yollar),
         teslim=teslim, sorunlu_dosyalari_sil=lambda ad: sorunlu_bloklari_sil(ad, yollar),
-        bekle=duvar_saatiyle_bekle, simdi=dt.datetime.now, kayit=kayit, hedef_sn=lambda m: hedef_sn(m, yollar))
+        bekle=duvar_saatiyle_bekle, simdi=dt.datetime.now, kayit=kayit, hedef_sn=lambda m: hedef_sn(m, yollar),
+        bosa_giden=lambda: bosa_giden(yollar))
+
+
+def bosa_giden(yollar: Yollar) -> int:
+    """Bugünkü kota gününde kotayı harcayıp ses getirmeyen istek sayısı (kayıp, zaman aşımı, boş, ret, hata)."""
+    from .kota import kota_gunu
+    sayac = olcum.istek_ozeti(yollar.istek_defteri, kota_gunu())
+    return sum(n for sonuc, n in sayac.items() if sonuc not in ("ses", "gitmedi", "sinir"))
 
 
 def sorunlu_bloklari_sil(ad: str, yollar: Yollar) -> int:
@@ -226,6 +236,11 @@ class Zamanlayici:
         if not isler:
             self.b.kayit("HEPSİ BİTTİ")
             return False
+        if (bosa := self.b.bosa_giden()) >= ISRAF_SINIRI:
+            self.b.kayit(f"ALARM: bugün {bosa} istek kota harcayıp ses getirmedi (sınır {ISRAF_SINIRI}); beklenmeyen "
+                         f"bir durum olabilir, kota yenilenene dek okuma durduruldu. Ayrıntı: .tmp/istek-defteri.jsonl")
+            self._kotayi_bekle()
+            return True
         boy = {i.ad: i.uzunluk for i in isler}
         with self.depo.degistir() as d:
             d.atama = {e: m for e, m in d.atama.items() if e in boy}

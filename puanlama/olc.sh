@@ -33,6 +33,21 @@ if adim kapsam; then
   "$PY" -m coverage json -q -o "$S/kapsam-python.json"
 fi
 
+if adim dayaniklilik; then
+  baslik "dayanıklılık testleri (ağ arızası, çökme, rastgele hata sırası)"
+  "$PY" - "$S/dayaniklilik.json" <<'PYEOF'
+import json, subprocess, sys
+sonuc = {}
+for m in ("test_ag_kopmasi", "test_cokme", "test_dayaniklilik"):
+    r = subprocess.run([sys.executable, "-m", "unittest", "-v", f"testler.{m}"], capture_output=True, text=True)
+    satir = [x for x in r.stderr.splitlines() if " ... " in x]
+    sonuc[m] = {"gecen": sum(x.endswith(" ok") for x in satir), "atlanan": sum(" skipped" in x for x in satir),
+                "kalan": sum(x.endswith(("FAIL", "ERROR")) for x in satir)}
+    print(m, sonuc[m])
+json.dump(sonuc, open(sys.argv[1], "w"))
+PYEOF
+fi
+
 if adim ruff; then
   baslik "ruff"
   "$PY" -m ruff check --no-cache --output-format json . > "$S/ruff.json" || true

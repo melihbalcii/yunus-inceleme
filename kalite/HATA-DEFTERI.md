@@ -7,7 +7,7 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
 
 | Ay | Bizden önce başkasının bulduğu | Araçların bulduğu | Bizim bulduğumuz |
 |---|---|---|---|
-| Kasım 2026 | 1 (Yunus: H-001) | 11 (H-004…H-012, H-014, H-015) | 3 (H-002, H-003, H-013) |
+| Kasım 2026 | 1 (Yunus: H-001) | 11 (H-004…H-012, H-014, H-015) | 6 (H-002, H-003, H-013, H-016, H-017, H-018) |
 
 ## Kayıtlar
 
@@ -18,9 +18,10 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
   ayrı yeniden deniyordu, denemeler çarpılıyordu.
 - **Neden kaçtı:** Testleri kodu yazan yazdı ve yalnız "her şey yolunda" durumunu sınadı. Kanıt okuma günlüğünde
   vardı, bakılmadı.
-- **Tür denetimi:** Hata senaryosu testleri (istek sayısını doğrular); planlı: rastgele senaryo (Hypothesis),
-  ağ arızası (Toxiproxy), canlı alarm.
-- **Durum:** Düzeltme gerçek projede yazılıyor, henüz doğrulanmadı.
+- **Tür denetimi:** Hata senaryosu testleri (istek sayısını doğrular); rastgele hata sırası (Hypothesis + başvuru
+  modeli, 400 senaryo); gerçek ağ arızası (Toxiproxy: ret, kopma, askı, yarım yanıt, gecikme — sunucuya ulaşan istek
+  sayılır); çökme testi (süreç öldürme); canlı alarm (bir kota gününde 4 istek boşa giderse okuma durur).
+- **Durum:** Düzeltildi; 6 Kasım'da gerçek projeye aktarıldı, okuma yeni kodla sürüyor.
 
 ### H-002 · Kota bitince okunmuş ses kayboluyor
 - **Bulan:** Okuma günlüğü (geriye dönük tarama), 5 Kasım 2026 · **Önem:** yüksek
@@ -112,3 +113,31 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
 - **Bulan:** import-linter (otomatik ölçüm), kendi yarım kodumda · **Tür:** Mimari
 - **Kök neden:** İstek defteri özeti kota gününü `gemini` modülünden alıyordu; veri katmanı üst katmanı çağıramaz.
 - **Düzeltme:** Kota takvimi en alt katmanda kendi modülünde (`sesli/kota.py`). **Durum:** Düzeltildi (iyilestirme dalı).
+
+### H-016 · Okuma ortamının kütüphaneleri yalnız iCloud'da, program açılışta takılıyor
+- **Bulan:** Biz (rastgele senaryo testi yazarken, 6 Kasım 2026) · **Önem:** yüksek (okuma hiç başlayamaz)
+- **Tür:** Hedef ortam uyumu (S2), dış bağımlılık
+- **Kök neden:** Proje Masaüstü'nde, Masaüstü iCloud'a eşitleniyor; macOS yer açmak için `.venv-ses` içindeki torch
+  kütüphanelerini (ör. 186 MB libtorch_cpu) Mac'ten kaldırıp yalnız iCloud'da bırakmış. Yeniden başlatmadan sonra
+  iCloud indirmesi ilerlemedi: torch'u yükleyen her komut (okuma, test) uyarı vermeden sonsuza kadar bekledi.
+  Aynı durumda 113.925 dosya / 19,1 GB (teslim MP3'leri, `.cache/huggingface` modeli) var.
+- **Tür denetimi:** `haftalik_denetim.py` artık okuma ortamında (`.venv-ses`, `.cache/python`, `.cache/huggingface`,
+  `araclar`) yalnız iCloud'da duran dosya var mı bakıyor, varsa alarm veriyor (`test_haftalik_denetim`, 3 test). İlk
+  çalıştırmada benim elle çıkardığım listede olmayan `.cache/python`'u (Python'un kendisi) yakaladı.
+- **Çözüm:** Finder'da klasöre sağ tıkla → "İndirileni Tut". Kullanıcı 6 Kasım'da üçünü işaretledi; `.cache/python`
+  eklenecek.
+- **Durum:** Denetim eklendi; indirme sürüyor.
+
+### H-017 · İstek sırasında çöken program blok başına günlük tavanı aşabiliyordu
+- **Bulan:** Çökme testi (`testler/test_cokme.py`), 6 Kasım 2026 · **Önem:** yüksek (kota kaybı) · **Tür:** Yarıda kalma (K2)
+- **Kök neden:** Blok sayacı istek BİTTİKTEN sonra diske yazılıyordu. İstek sürerken süreç ölürse (elektrik, kill -9,
+  yeniden başlatma) sayaç hiç artmıyordu: üst üste 7 çökmede 7 istek gitti, tavan 4.
+- **Düzeltme:** Bütçe istekten ÖNCE harcanmış sayılıp yazılır, harcanmayan kısmı sonra iade edilir. Çökmede sayaç
+  fazla sayar (güvenli yön). **Tür denetimi:** gerçek süreç öldürülerek yapılan çökme testi. **Durum:** Düzeltildi.
+
+### H-018 · Gelen ses ölçülürken program çökerse ses kayboluyordu
+- **Bulan:** Çökme testi, 6 Kasım 2026 · **Önem:** yüksek (H-002'nin kalan parçası) · **Tür:** Yarıda kalma (K2, K3)
+- **Kök neden:** Gemini'den gelen ses önce Whisper ile ölçülüyor (dakikalar), ancak sonra diske yazılıyordu. Bu arada
+  çökme olursa ses kayboluyor, kota boşa gidiyor, ertesi açılışta aynı blok yeniden isteniyordu.
+- **Düzeltme:** Ses gelir gelmez "bekleyen" olarak diske yazılır; açılışta önce bekleyenler ölçülür, yeni istek atılmaz.
+- **Tür denetimi:** çökme testi (ölçüm anında öldürme). **Durum:** Düzeltildi.

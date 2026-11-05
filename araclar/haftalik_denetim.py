@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import re
 import subprocess
 import sys
@@ -23,6 +24,9 @@ GUNLUK = KOK / ".tmp" / "fola-sirayla.log"
 DEFTER = KOK / ".tmp" / "istek-defteri.jsonl"
 DURUM = KOK / ".tmp" / "denetim-durumu.json"
 RAPOR = KOK / "notlar" / "denetim"
+# okuma programının çalışırken açtığı yerler: biri yalnız iCloud'daysa program uyarısız takılır (H-016)
+ORTAM = (".venv-ses", ".cache/python", ".cache/huggingface", "araclar")
+SF_DATALESS = 0x40000000  # macOS: içeriği Mac'te olmayan, yalnız iCloud'da duran dosya (sys/stat.h)
 
 BOSA_ORAN_SINIRI = 0.15   # kota harcayan isteklerin bundan fazlası ses getirmediyse alarm
 ZAMAN = re.compile(r"^(\d{2}\.\d{2} \d{2}:\d{2}) ")
@@ -127,6 +131,32 @@ def surecleri_denetle() -> list[Bulgu]:
     return [Bulgu(len(zamanlayici) > 1, f"Çalışan okuma programı kopyası: {len(zamanlayici)}", zamanlayici)]
 
 
+def _bayrak(yol: str) -> tuple[int, int]:
+    try:
+        st = os.lstat(yol)
+    except OSError:
+        return 0, 0
+    return getattr(st, "st_flags", 0), st.st_size
+
+
+def ortami_denetle(kok: Path = KOK) -> list[Bulgu]:
+    """Okuma ortamında yalnız iCloud'da duran dosya var mı? Dosyaları açmaz (açmak indirmeyi başlatıp takılırdı),
+    yalnız işaretlerine bakar."""
+    eksik: dict[str, list[int]] = {}
+    for ad in ORTAM:
+        for kl, _, dosyalar in os.walk(kok / ad):
+            for d in dosyalar:
+                bayrak, boy = _bayrak(os.path.join(kl, d))
+                if bayrak & SF_DATALESS:
+                    e = eksik.setdefault(ad, [0, 0])
+                    e[0] += 1
+                    e[1] += boy
+    ayrinti = [f"{ad}: {n} dosya, {b / 1e9:.2f} GB yalnız iCloud'da" for ad, (n, b) in eksik.items()]
+    if ayrinti:
+        ayrinti.append("Çözüm: Finder'da klasöre sağ tıkla → \"İndirileni Tut\"")
+    return [Bulgu(bool(eksik), f"Okuma ortamında Mac'te olmayan dosya: {sum(n for n, _ in eksik.values())}", ayrinti)]
+
+
 def main(argv: list[str] | None = None) -> int:
     a = argparse.ArgumentParser(description="Gerçek kayıtların denetimi")
     a.add_argument("--bastan", action="store_true", help="bütün günlüğü baştan denetle")
@@ -134,7 +164,7 @@ def main(argv: list[str] | None = None) -> int:
     durum = {} if ayar.bastan or not DURUM.exists() else json.loads(DURUM.read_text())
     gunluk, g_konum = _satirlar(GUNLUK, int(durum.get("gunluk", 0)))
     defter, d_konum = _satirlar(DEFTER, int(durum.get("defter", 0)))
-    bulgular = gunlugu_denetle(gunluk) + defteri_denetle(defter) + surecleri_denetle()
+    bulgular = gunlugu_denetle(gunluk) + defteri_denetle(defter) + surecleri_denetle() + ortami_denetle()
 
     simdi = dt.datetime.now()
     alarm = [b for b in bulgular if b.alarm]

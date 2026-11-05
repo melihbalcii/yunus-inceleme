@@ -10,3 +10,4 @@ kitaplik/.stryker-tmp/
 kitaplik/.lighthouseci/
 kitaplik/reports/
 puanlama/sonuclar/
+.cache/

@@ -191,3 +191,40 @@ class HedefSureTesti(GeciciKokTesti):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CanliAlarmTesti(GeciciKokTesti):
+    """Bugün kota harcayıp ses getirmeyen istekler sınıra ulaşırsa okuma o gün durur (H-001 türü bir sorun canlıda
+    yakalanır)."""
+
+    def test_israf_sinira_ulasinca_okuma_durur_kota_yenilenince_surer(self):
+        s = Sahne(self, {"kisa-oyku": 1000})
+        bosa = [Z.ISRAF_SINIRI, 0]
+        s.b.bosa_giden = lambda: bosa.pop(0) if bosa else 0
+        s.cikislar = [Cikis.TAMAM]
+        s.teslimler = [TeslimDurumu.KONULDU]
+        s.zamanlayici().calis(tur_siniri=5)
+        self.assertTrue(any(k.startswith("ALARM") for k in s.kayitlar))
+        self.assertEqual(len(s.beklemeler), 1, "alarm günü kota yenilenene dek beklenmeli")
+        self.assertEqual(len(s.isler), 1, "ertesi gün okuma sürmeli")
+
+    def test_sinirin_altinda_okuma_surer(self):
+        s = Sahne(self, {"kisa-oyku": 1000})
+        s.b.bosa_giden = lambda: Z.ISRAF_SINIRI - 1
+        s.cikislar = [Cikis.TAMAM]
+        s.teslimler = [TeslimDurumu.KONULDU]
+        s.zamanlayici().calis(tur_siniri=5)
+        self.assertFalse(any(k.startswith("ALARM") for k in s.kayitlar))
+        self.assertEqual((len(s.isler), s.beklemeler), (1, []))
+
+
+class BosaGidenTesti(GeciciKokTesti):
+    def test_yalniz_kota_harcayip_ses_getirmeyenler_sayilir(self):
+        from sesli.kota import kota_gunu
+        import json as _json
+        simdi = dt.datetime.now().astimezone()
+        zaman = simdi.strftime("%Y-%m-%dT%H:%M:%S%z")
+        sonuclar = ["ses", "ses", "kayip", "zaman_asimi", "bos", "guvenlik", "hata", "gitmedi", "sinir"]
+        self.y.istek_defteri.write_text("".join(_json.dumps({"zaman": zaman, "sonuc": x}) + "\n" for x in sonuclar))
+        self.assertEqual(kota_gunu(simdi), kota_gunu())
+        self.assertEqual(Z.bosa_giden(self.y), 5)
