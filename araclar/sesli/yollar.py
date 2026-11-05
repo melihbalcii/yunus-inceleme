@@ -23,7 +23,8 @@ class Yollar:
     def varsayilan(cls) -> Yollar:
         ev = Path.home()
         return cls(kok=PROJE_KOKU, teslim=ev / "Desktop" / "sesli kitap fola",
-                   emel_teslim=ev / "Desktop" / "sesli kitap", yayin=ev / "Library" / "Caches" / "melihten-dinle" / "yayin", cop=ev / ".Trash")
+                   emel_teslim=ev / "Desktop" / "sesli kitap",
+                   yayin=ev / "Library" / "Caches" / "melihten-dinle" / "yayin", cop=ev / ".Trash")
 
     @classmethod
     def kok_altinda(cls, kok: Path) -> Yollar:

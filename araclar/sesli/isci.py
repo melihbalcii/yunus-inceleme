@@ -86,6 +86,16 @@ def _oku_ve_denetle(is_: IsTanimi, yollar: Yollar,
     return Cikis.TAMAM
 
 
+# Alt süreçteki hata türü → zamanlayıcıya giden çıkış kodu ve günlük iletisi (sıra önemli: ilk eşleşen)
+_HATA_CIKISLARI: tuple[tuple[type[BaseException], Cikis, str], ...] = (
+    (ZatenCalisiyor, Cikis.GECICI, "GEÇİCİ SORUN: {ad} şu an başka bir süreçte okunuyor; {h}"),
+    (G.KotaDoldu, Cikis.KOTA, "KOTA_DOLDU: günlük ücretsiz kota bitti; yarın kaldığı yerden sürer."),
+    (G.GuvenlikReddi, Cikis.GUVENLIK, "GUVENLIK: güvenlik filtresi bu metni reddetti; bu araçla okunamaz."),
+    (BolunemezHata, Cikis.BOLUNEMEZ, "BOŞ YANIT: {h}"),
+    (G.GeciciHata, Cikis.GECICI, "GEÇİCİ SORUN: {h}"),
+)
+
+
 def oku_eser(is_: IsTanimi, yollar: Yollar,
              tts_kur: Callable[[G.Arac, Yollar, Callable[[str], None]], Seslendirici] = _gercek_tts) -> Cikis:
     """Alt sürecin içinde çalışır: okur, kontrol eder; sonucu çıkış koduna çevirir."""
@@ -96,21 +106,10 @@ def oku_eser(is_: IsTanimi, yollar: Yollar,
     try:
         with tek_kopya(yollar.eser_kilidi(is_.ad)):  # aynı eseri iki süreç aynı anda okumasın
             return _oku_ve_denetle(is_, yollar, tts_kur, bildir)
-    except ZatenCalisiyor as h:
-        bildir(f"GEÇİCİ SORUN: {is_.ad} şu an başka bir süreçte okunuyor; {h}")
-        return Cikis.GECICI
-    except G.KotaDoldu:
-        bildir("KOTA_DOLDU: günlük ücretsiz kota bitti; yarın kaldığı yerden sürer.")
-        return Cikis.KOTA
-    except G.GuvenlikReddi:
-        bildir("GUVENLIK: güvenlik filtresi bu metni reddetti; bu araçla okunamaz.")
-        return Cikis.GUVENLIK
-    except BolunemezHata as h:
-        bildir(f"BOŞ YANIT: {h}")
-        return Cikis.BOLUNEMEZ
-    except G.GeciciHata as h:
-        bildir(f"GEÇİCİ SORUN: {h}")
-        return Cikis.GECICI
-    except Exception:  # noqa: BLE001 — süreç sınırı: ayrıntı günlüğe, zamanlayıcıya yalnız kod
+    except Exception as h:  # noqa: BLE001 — süreç sınırı: hata türü çıkış koduna, ayrıntı günlüğe
+        for tur, cikis, ileti in _HATA_CIKISLARI:
+            if isinstance(h, tur):
+                bildir(ileti.format(ad=is_.ad, h=h))
+                return cikis
         bildir(traceback.format_exc())
         return Cikis.HATA

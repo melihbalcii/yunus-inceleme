@@ -178,23 +178,25 @@ class GeminiTTS:
             except errors.ClientError as h:
                 if h.code != KOTA_REDDI:
                     raise
-                if re.search(r"per ?day|PerDay", str(h), re.I):
-                    raise KotaDoldu(str(h)[:200]) from h
                 dakikalik += 1
-                if dakikalik >= DAKIKALIK_DENEME:
-                    raise GeciciHata("dakikalık sınır geçmedi") from h
-                m = re.search(r"retry in (\d+)", str(h), re.I)
-                sn = int(m.group(1)) + 2 if m else 30 * dakikalik
-                self._bildir(f"dakikalık sınır: {sn} sn bekleniyor")
-                self._uyu(sn)
+                self._sinirda_bekle(h, dakikalik)
                 continue
             return self._yanittan_ses(yanit, metin, bas)
+
+    def _sinirda_bekle(self, h: Exception, dakikalik: int) -> None:
+        """429: günlük kota bittiyse KotaDoldu; dakikalık sınırsa söylenen kadar bekler (çok tekrarlarsa GeciciHata)."""
+        if re.search(r"per ?day|PerDay", str(h), re.I):
+            raise KotaDoldu(str(h)[:200]) from h
+        if dakikalik >= DAKIKALIK_DENEME:
+            raise GeciciHata("dakikalık sınır geçmedi") from h
+        m = re.search(r"retry in (\d+)", str(h), re.I)
+        sn = int(m.group(1)) + 2 if m else 30 * dakikalik
+        self._bildir(f"dakikalık sınır: {sn} sn bekleniyor")
+        self._uyu(sn)
 
     def _istek(self, metin: str) -> tuple[Any, float]:
         """Tek istek atar ve yanıtını bekler. Önceki istek sürüyorsa yenisini atmaz. Hata türünü _Gitmedi /
         _Kayip / Gemini'nin kendi istisnalarına çevirir; her isteği deftere yazar."""
-        import httpx
-        from google.genai import errors
 
         if self._ucusta is not None and self._ucusta.is_alive():
             raise GeciciHata("önceki istek hâlâ sürüyor; aynı anda ikinci istek atılmaz")
@@ -228,19 +230,30 @@ class GeminiTTS:
             self.atilan += 1
             return sonuc[0], bas
         h = hata[0]
+        cevrilmis = self._hatayi_kaydet(h, metin, bas)
+        if cevrilmis is h:
+            raise h
+        raise cevrilmis from h
+
+    def _hatayi_kaydet(self, h: BaseException, metin: str, bas: float) -> BaseException:
+        """İsteğin hatasını deftere yazar, kotayı harcamış olabileceklerini sayar; yukarı iletilecek hatayı döner:
+        hiç gitmeyen istek _Gitmedi, gidip yanıtı kaybolan _Kayip, öbürleri olduğu gibi."""
+        import httpx
+        from google.genai import errors
+
         if isinstance(h, (httpx.ConnectError, httpx.ConnectTimeout, ConnectionRefusedError)):
             self._yaz(metin, bas, "gitmedi")
-            raise _Gitmedi() from h
+            return _Gitmedi()
         if isinstance(h, (httpx.TimeoutException, httpx.TransportError, ConnectionError, errors.ServerError)):
             self._yaz(metin, bas, "kayip")
             self.atilan += 1
-            raise _Kayip() from h
+            return _Kayip()
         if isinstance(h, errors.ClientError) and h.code == KOTA_REDDI:
             self._yaz(metin, bas, "sinir")
         else:
             self._yaz(metin, bas, "hata")
             self.atilan += 1
-        raise h
+        return h
 
     def _yaz(self, metin: str, bas: float, sonuc: str, ses_sn: float | None = None) -> None:
         kayit: dict[str, Any] = {

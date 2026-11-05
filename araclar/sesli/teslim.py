@@ -43,14 +43,8 @@ def gecerli_teslim(eser: Eser, yollar: Yollar) -> Path | None:
                  if p.parent.name not in YENILENECEK), None)
 
 
-def teslim_et(eser: Eser, yollar: Yollar) -> TeslimSonucu:
-    fola = yollar.fola_klasoru(eser.ad)
-    kaynak = fola / f"{eser.ad}.mp3"
-    if not kaynak.exists():
-        return TeslimSonucu(TeslimDurumu.KAYIT_YOK)
-    mevcut = gecerli_teslim(eser, yollar)
-    if mevcut and mevcut.stat().st_mtime >= kaynak.stat().st_mtime:
-        return TeslimSonucu(TeslimDurumu.GUNCEL, mevcut)
+def _teslime_hazir(fola: Path) -> TeslimSonucu | tuple[KontrolSonucu, str, str]:
+    """Kontrolden geçmiş, sesi bozulmamış ve aracı bilinen kayıt: (kontrol, araç adı, ses adı); değilse engel."""
     kontrol = KontrolSonucu.oku(fola)
     if kontrol is None:
         return TeslimSonucu(TeslimDurumu.KONTROL_YOK)
@@ -59,14 +53,28 @@ def teslim_et(eser: Eser, yollar: Yollar) -> TeslimSonucu:
     try:
         kalite = json.loads((fola / "kalite.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return TeslimSonucu(TeslimDurumu.KALITE_DUSUK, eslesme=kontrol.eslesme)
-    if any(k["bozuk"] for k in kalite):
+        kalite = None
+    if kalite is None or any(k["bozuk"] for k in kalite):
         return TeslimSonucu(TeslimDurumu.KALITE_DUSUK, eslesme=kontrol.eslesme)
     try:
         motor = json.loads((fola / "motor.json").read_text(encoding="utf-8"))
-        arac_adi, ses_adi = motor["motor"], motor["ses"]
+        return kontrol, motor["motor"], motor["ses"]
     except (OSError, ValueError, KeyError):
         return TeslimSonucu(TeslimDurumu.ARAC_BILINMIYOR)
+
+
+def teslim_et(eser: Eser, yollar: Yollar) -> TeslimSonucu:
+    fola = yollar.fola_klasoru(eser.ad)
+    kaynak = fola / f"{eser.ad}.mp3"
+    if not kaynak.exists():
+        return TeslimSonucu(TeslimDurumu.KAYIT_YOK)
+    mevcut = gecerli_teslim(eser, yollar)
+    if mevcut and mevcut.stat().st_mtime >= kaynak.stat().st_mtime:
+        return TeslimSonucu(TeslimDurumu.GUNCEL, mevcut)
+    hazir = _teslime_hazir(fola)
+    if isinstance(hazir, TeslimSonucu):
+        return hazir
+    kontrol, arac_adi, ses_adi = hazir
 
     klasor = yollar.teslim / arac_adi.replace(" TTS", "")
     if klasor.name in YENILENECEK:

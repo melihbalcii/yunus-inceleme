@@ -230,6 +230,39 @@ def _json_yaz(yol: Path, veri: object) -> None:
     gecici.replace(yol)
 
 
+def _site_dosyalarini_kopyala(yollar: Yollar) -> None:
+    """Site dosyaları her seferinde baştan kopyalanır; ses parçaları (ses/) yerinde kalır."""
+    yollar.yayin.mkdir(parents=True, exist_ok=True)
+    (yollar.yayin / "ses").mkdir(exist_ok=True)
+    for eski in yollar.yayin.iterdir():
+        if eski.name != "ses":
+            shutil.rmtree(eski) if eski.is_dir() else eski.unlink()
+    for dosya in (yollar.kitaplik / "public").iterdir():
+        if dosya.name == ".DS_Store":
+            continue
+        hedef = yollar.yayin / dosya.name
+        shutil.copytree(dosya, hedef) if dosya.is_dir() else shutil.copy2(dosya, hedef)
+
+
+def _eksik_sesleri_kodla(eserler: list[YayinEseri], bildir: Callable[[str], None]) -> None:
+    """Parçaları hazır olmayan (bilgi.json'u olmayan) eserleri baştan kodlar."""
+    eksik = [e for e in eserler if not (e.klasor / "bilgi.json").exists()]
+    for e in eksik:
+        shutil.rmtree(e.klasor, ignore_errors=True)
+    if eksik:
+        with ProcessPoolExecutor(ESZAMANLI) as havuz:
+            for satir in havuz.map(parcala, [e.mp3 for e in eksik], [e.klasor for e in eksik]):
+                bildir(satir)
+
+
+def _eski_parcalari_cikar(yollar: Yollar, gecerli: set[str], bildir: Callable[[str], None]) -> None:
+    """Katalogdan çıkan ya da değişen eserin eski parçaları yayından silinir."""
+    for klasor in (yollar.yayin / "ses").iterdir():
+        if klasor.name not in gecerli:
+            shutil.rmtree(klasor)
+            bildir(f"yayından çıkarıldı: {klasor.name}")
+
+
 def hazirla(yollar: Yollar, bildir: Callable[[str], None] = print,
             kuru: bool = False) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Yayın klasörünü günceller. kuru=True: hiçbir şey yazmaz, yalnız katalog ve yakında içeriğini hesaplar (ses
@@ -239,23 +272,8 @@ def hazirla(yollar: Yollar, bildir: Callable[[str], None] = print,
     eserler = yayin_eserleri(katalog, yollar, bildir)
 
     if not kuru:
-        yollar.yayin.mkdir(parents=True, exist_ok=True)
-        (yollar.yayin / "ses").mkdir(exist_ok=True)
-        for eski in yollar.yayin.iterdir():  # site dosyaları her seferinde baştan kopyalanır
-            if eski.name != "ses":
-                shutil.rmtree(eski) if eski.is_dir() else eski.unlink()
-        for dosya in (yollar.kitaplik / "public").iterdir():
-            if dosya.name == ".DS_Store":
-                continue
-            hedef = yollar.yayin / dosya.name
-            shutil.copytree(dosya, hedef) if dosya.is_dir() else shutil.copy2(dosya, hedef)
-        eksik = [e for e in eserler if not (e.klasor / "bilgi.json").exists()]
-        for e in eksik:
-            shutil.rmtree(e.klasor, ignore_errors=True)
-        if eksik:
-            with ProcessPoolExecutor(ESZAMANLI) as havuz:
-                for satir in havuz.map(parcala, [e.mp3 for e in eksik], [e.klasor for e in eksik]):
-                    bildir(satir)
+        _site_dosyalarini_kopyala(yollar)
+        _eksik_sesleri_kodla(eserler, bildir)
 
     tanitim = json.loads((yollar.kitaplik / "tanitim.json").read_text(encoding="utf-8"))
     eksik_bilgi = [e.mp3.name for e in eserler if not (e.klasor / "bilgi.json").exists()]
@@ -270,11 +288,7 @@ def hazirla(yollar: Yollar, bildir: Callable[[str], None] = print,
     if kuru:
         return katalog_json, yakinda
 
-    gecerli = {e.klasor.name for e in eserler}
-    for klasor in (yollar.yayin / "ses").iterdir():
-        if klasor.name not in gecerli:  # katalogdan çıkan ya da değişen eserin eski parçaları
-            shutil.rmtree(klasor)
-            bildir(f"yayından çıkarıldı: {klasor.name}")
+    _eski_parcalari_cikar(yollar, {e.klasor.name for e in eserler}, bildir)
     _json_yaz(yollar.yayin / "katalog.json", katalog_json)
     _json_yaz(yollar.yayin / "yakinda.json", yakinda)
     buyuk = [p for p in (yollar.yayin / "ses").rglob("*.mp3") if p.stat().st_size > NETLIFY_SINIRI]
