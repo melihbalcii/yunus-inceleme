@@ -171,8 +171,12 @@ class DenemeDeposu:
         self._kayit.unlink(missing_ok=True)
 
 
+class _ButceBitti(Exception):
+    """Bloğun bugünkü istek bütçesi bitti; eldeki en iyi deneme kullanılır (seslendir içinde kalır)."""
+
+
 class Okuyucu:
-    def __init__(self, tts: Seslendirici, ayar: OkumaAyari, yollar: Yollar, bildir: Callable[[str], None] = print,
+    def __init__(self, tts: Seslendirici, ayar: OkumaAyari, yollar: Yollar, *, bildir: Callable[[str], None] = print,
                  olc: Callable[[str, S.Dalga], tuple[float, list[str]]] | None = None,
                  kalite: Callable[[S.Dalga], tuple[float, float]] = S.kalite,
                  yamala: Callable[..., S.Dalga | None] | None = None,
@@ -212,6 +216,23 @@ class Okuyucu:
         depo = self._depo(metin)
         if depo.bolunecek:
             return self._bolerek(metin, etiket)
+        kayitli = self._kayitli_iyi(depo, metin, etiket)
+        if kayitli is not None:
+            return kayitli
+        while len(depo.denemeler) < self.ayar.deneme and depo.istek < BLOK_TAVANI:
+            try:
+                ses = self._bir_deneme(depo, metin, etiket)
+            except _ButceBitti:
+                break  # bugünkü bütçe bitti: eldeki en iyi deneme tutulur
+            if ses is not None:
+                return ses
+        if not depo.denemeler:
+            raise GeciciHata(f"blok için bugün {BLOK_TAVANI} istek harcandı, ses alınamadı")
+        en_iyi = max(depo.denemeler, key=lambda d: d.puan)  # eşik tutmasa da en iyisi; kontrol raporu gösterir
+        return depo.ses(en_iyi)
+
+    def _kayitli_iyi(self, depo: DenemeDeposu, metin: str, etiket: str) -> S.Dalga | None:
+        """Ölçülmeden kalmış okumaları ölçer (istek atmaz); eşiği tutan kayıtlı deneme varsa onun sesi."""
         for dosya in list(depo.bekleyen):
             self.bildir(f"{etiket} ölçülmeden kalmış okuma ölçülüyor (yeni istek yok): {dosya}")
             self._degerlendir(depo, metin, dosya, depo.oku(dosya), etiket)
@@ -219,30 +240,29 @@ class Okuyucu:
             self.bildir(f"{etiket} kayıtlı deneme kullanılıyor: {d.dosya} (eşleşme {d.oran:.3f})")
             if d.iyi:
                 return depo.ses(d)
-        while len(depo.denemeler) < self.ayar.deneme and depo.istek < BLOK_TAVANI:
-            try:
-                ses = self._iste(depo, metin, TEK_ISTEK_BUTCESI)
-            except GuvenlikReddi as h:
-                if not h.bolunebilir:
-                    raise
-                return self._bolunecek(depo, metin, etiket)
-            except BosYanit:
-                return self._bolunecek(depo, metin, etiket)
-            except GeciciHata:
-                if depo.denemeler:
-                    break  # bugünkü bütçe bitti: eldeki en iyi deneme tutulur
+        return None
+
+    def _bir_deneme(self, depo: DenemeDeposu, metin: str, etiket: str) -> S.Dalga | None:
+        """Bir okuma isteği (gerekirse yama). Tutan ses ya da None (yeniden denenebilir). Boş yanıt ve bölünebilir
+        güvenlik reddinde blok ikiye bölünür. Elde deneme varken bütçe biterse _ButceBitti."""
+        try:
+            ses = self._iste(depo, metin, TEK_ISTEK_BUTCESI)
+        except GuvenlikReddi as h:
+            if not h.bolunebilir:
                 raise
-            d = self._degerlendir(depo, metin, depo.sakla(ses), ses, etiket)
-            if d.iyi:
-                return ses
-            if not d.bozuk and d.oran >= YAMA_ESIGI and depo.istek < BLOK_TAVANI:
-                onarilmis = self._yamayi_dene(depo, metin, ses, etiket)
-                if onarilmis is not None:
-                    return onarilmis
-        if not depo.denemeler:
-            raise GeciciHata(f"blok için bugün {BLOK_TAVANI} istek harcandı, ses alınamadı")
-        en_iyi = max(depo.denemeler, key=lambda d: d.puan)  # eşik tutmasa da en iyisi; kontrol raporu gösterir
-        return depo.ses(en_iyi)
+            return self._bolunecek(depo, metin, etiket)
+        except BosYanit:
+            return self._bolunecek(depo, metin, etiket)
+        except GeciciHata as h:
+            if depo.denemeler:
+                raise _ButceBitti from h
+            raise
+        d = self._degerlendir(depo, metin, depo.sakla(ses), ses, etiket)
+        if d.iyi:
+            return ses
+        if not d.bozuk and d.oran >= YAMA_ESIGI and depo.istek < BLOK_TAVANI:
+            return self._yamayi_dene(depo, metin, ses, etiket)
+        return None
 
     def _degerlendir(self, depo: DenemeDeposu, metin: str, dosya: str, ses: S.Dalga, etiket: str) -> Deneme:
         """Diske yazılmış bir okumayı ölçer ve deneme olarak kaydeder (istek atmaz)."""
@@ -259,7 +279,7 @@ class Okuyucu:
 
     def _yamayi_dene(self, depo: DenemeDeposu, metin: str, ses: S.Dalga, etiket: str) -> S.Dalga | None:
         try:  # yama tek istektir: yanıtı kaybolursa tekrar edilmez
-            onarilmis = self._yamala(metin, ses, lambda m: self._iste(depo, m, 1), ESIK, self.bildir)
+            onarilmis = self._yamala(metin, ses, lambda m: self._iste(depo, m, 1), ESIK, bildir=self.bildir)
         except KotaDoldu:
             raise
         except Exception as h:  # yama beklenmedik bir duruma düşerse blok eski yolla yeniden okunur

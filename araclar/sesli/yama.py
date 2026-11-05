@@ -36,6 +36,13 @@ class _Kesim:
     ses: S.Dalga | None = None
 
 
+@dataclass
+class _Dinleme:
+    """Bir sesin Whisper kelime zamanları ve süresi (sn)."""
+    duy: list[KelimeZamani]
+    sure: float
+
+
 def _eslestir(hedef: list[str], duy: list[KelimeZamani]) -> Eslesme:
     h = [x[0] for x in duy]
     ops = difflib.SequenceMatcher(None, hedef, h, autojunk=False).get_opcodes()
@@ -52,24 +59,21 @@ def _ara_nokta(duy: list[KelimeZamani], j: int, sure: float) -> float:
     return (duy[j - 1][2] + duy[j][1]) / 2
 
 
-def yamala(metin: str, ses: S.Dalga, uret: Callable[[str], S.Dalga], esik: float,
-           bildir: Callable[[str], None] = print,
-           kelime_zamanlari: Callable[[S.Dalga], list[KelimeZamani]] = S.kelime_zamanlari) -> S.Dalga | None:
-    """`uret` bir metni seslendiren istektir (gemini.GeminiTTS.uret); TTSHatasi fırlatırsa onarım yapılamamış sayılır,
-    KotaDoldu ise yukarı iletilir."""
-
-    duy = kelime_zamanlari(ses)
-    cumle = cumleler(metin)
-    hedef: list[str] = []
+def _kelimeler(parcalar: Sequence[str]) -> tuple[list[str], list[int]]:
+    """Parçaların sade kelimeleri art arda ve her kelimenin hangi parçadan geldiği."""
+    kelime: list[str] = []
     hangi: list[int] = []
-    for i, c in enumerate(cumle):
+    for i, c in enumerate(parcalar):
         k = sade_kelimeler(c)
-        hedef += k
+        kelime += k
         hangi += [i] * len(k)
-    if hedef != sade_kelimeler(metin) or not duy:
-        return None
-    ops, es, h = _eslestir(hedef, duy)
-    sure = len(ses) / S.SR
+    return kelime, hangi
+
+
+def _eksik_ve_fazla(eslesme: Eslesme, hedef: list[str], hangi: list[int],
+                    d: _Dinleme) -> tuple[list[list[int]], list[tuple[float, float]]]:
+    """Atlanan cümle bölgeleri ([ilk, son] cümle no; bitişikler birleşir) ve kesilecek fazla okumalar (sn aralığı)."""
+    ops, _, h = eslesme
     bolgeler: list[list[int]] = []
     atilacak: list[tuple[float, float]] = []
     for op, i1, i2, j1, j2 in ops:
@@ -80,62 +84,59 @@ def yamala(metin: str, ses: S.Dalga, uret: Callable[[str], S.Dalga], esik: float
             else:
                 bolgeler.append([a, b])
         elif op == "insert" and j2 - j1 >= FAZLA_EN_AZ_KELIME and len("".join(h[j1:j2])) >= FAZLA_EN_AZ_HARF:
-            atilacak.append((_ara_nokta(duy, j1, sure), _ara_nokta(duy, j2, sure)))
+            atilacak.append((_ara_nokta(d.duy, j1, d.sure), _ara_nokta(d.duy, j2, d.sure)))
+    return bolgeler, atilacak
+
+
+def _kesimler(bolgeler: list[list[int]], hangi: list[int], es: dict[int, int], d: _Dinleme,
+              cumle: list[str]) -> list[_Kesim] | None:
+    """Her atlanan bölge için blok sesinde yamanın gireceği aralık; bölge çok fazlaysa ya da çevresi güvenle
+    bulunamazsa None."""
     if len(bolgeler) > EN_COK_YER:
         return None
-
     kesim: list[_Kesim] = []
     for a, b in bolgeler:
         ilk = hangi.index(a)
         son = len(hangi) - 1 - hangi[::-1].index(b)
         once = [es[i] for i in range(ilk) if i in es]
-        sonra = [es[i] for i in range(son + 1, len(hedef)) if i in es]
+        sonra = [es[i] for i in range(son + 1, len(hangi)) if i in es]
         if once and sonra and sonra[0] <= once[-1]:
             return None
-        kesim.append(_Kesim(_ara_nokta(duy, once[-1] + 1, sure) if once else 0.0,
-                            _ara_nokta(duy, sonra[0], sure) if sonra else sure, " ".join(cumle[a:b + 1])))
-    kesim += [_Kesim(t0, t1) for t0, t1 in atilacak if not any(k.t0 <= t0 < k.t1 for k in kesim)]
-    if not kesim:
-        return None
+        kesim.append(_Kesim(_ara_nokta(d.duy, once[-1] + 1, d.sure) if once else 0.0,
+                            _ara_nokta(d.duy, sonra[0], d.sure) if sonra else d.sure, " ".join(cumle[a:b + 1])))
+    return kesim
 
-    yazilar = [k.yazi for k in kesim if k.yazi]
-    if sum(len(x) for x in yazilar) > EN_COK_YAMA_KR:
-        return None
-    if yazilar:
-        yama_metni = "\n\n".join(yazilar)
-        try:
-            y = uret(yama_metni)
-        except (BosYanit, GuvenlikReddi):
-            return None
-        yduy = kelime_zamanlari(y)
-        yhedef: list[str] = []
-        ybolge: list[int] = []
-        for n, x in enumerate(yazilar):
-            k = sade_kelimeler(x)
-            yhedef += k
-            ybolge += [n] * len(k)
-        oran = difflib.SequenceMatcher(None, "".join(yhedef), "".join(x[0] for x in yduy), autojunk=False).ratio()
-        eksik = atlamalar(yhedef, [x[0] for x in yduy])
-        bildir(f"   yama: {len(yazilar)} yer, {len(yama_metni)} kr tek istekte, {len(y) / S.SR:.1f} sn, "
-               f"eşleşme {oran:.3f}" + (f", ATLAMA: {eksik}" if eksik else ""))
-        if oran < esik or eksik:
-            return None
-        _, yes, _ = _eslestir(yhedef, yduy)
-        ysure, sinir = len(y) / S.SR, [0.0]
-        for n in range(1, len(yazilar)):  # n-1. ve n. yama parçası arasındaki duraklama
-            son_ = [yes[i] for i in range(len(yhedef)) if ybolge[i] == n - 1 and i in yes]
-            ilk_ = [yes[i] for i in range(len(yhedef)) if ybolge[i] == n and i in yes]
-            if not son_ or not ilk_ or ilk_[0] <= son_[-1]:
-                return None
-            sinir.append(_ara_nokta(yduy, ilk_[0], ysure))
-        sinir.append(ysure)
-        parca = iter(S.kirp(y[int(sinir[n] * S.SR):int(sinir[n + 1] * S.SR)]) for n in range(len(yazilar)))
-        for kes in kesim:
-            if kes.yazi:
-                kes.ses = next(parca)
-    else:
-        bildir(f"   yama: yalnız {len(kesim)} fazla okuma kesildi (istek harcanmadı)")
 
+def _yamayi_oku(yazilar: list[str], uret: Callable[[str], S.Dalga], esik: float, bildir: Callable[[str], None],
+                kelime_zamanlari: Callable[[S.Dalga], list[KelimeZamani]]) -> list[S.Dalga] | None:
+    """Atlanan yerleri TEK istekte okutur, ölçer ve yerlerine göre parçalara böler; tutmazsa None."""
+    yama_metni = "\n\n".join(yazilar)
+    try:
+        y = uret(yama_metni)
+    except (BosYanit, GuvenlikReddi):
+        return None
+    yduy = kelime_zamanlari(y)
+    yhedef, ybolge = _kelimeler(yazilar)
+    oran = difflib.SequenceMatcher(None, "".join(yhedef), "".join(x[0] for x in yduy), autojunk=False).ratio()
+    eksik = atlamalar(yhedef, [x[0] for x in yduy])
+    bildir(f"   yama: {len(yazilar)} yer, {len(yama_metni)} kr tek istekte, {len(y) / S.SR:.1f} sn, "
+           f"eşleşme {oran:.3f}" + (f", ATLAMA: {eksik}" if eksik else ""))
+    if oran < esik or eksik:
+        return None
+    _, yes, _ = _eslestir(yhedef, yduy)
+    ysure, sinir = len(y) / S.SR, [0.0]
+    for n in range(1, len(yazilar)):  # n-1. ve n. yama parçası arasındaki duraklama
+        son_ = [yes[i] for i in range(len(yhedef)) if ybolge[i] == n - 1 and i in yes]
+        ilk_ = [yes[i] for i in range(len(yhedef)) if ybolge[i] == n and i in yes]
+        if not son_ or not ilk_ or ilk_[0] <= son_[-1]:
+            return None
+        sinir.append(_ara_nokta(yduy, ilk_[0], ysure))
+    sinir.append(ysure)
+    return [S.kirp(y[int(sinir[n] * S.SR):int(sinir[n + 1] * S.SR)]) for n in range(len(yazilar))]
+
+
+def _birlestir(ses: S.Dalga, kesim: list[_Kesim]) -> S.Dalga | None:
+    """Kesimleri sırayla uygular: aralık atılır, varsa yerine yama sesi (öncesi ve sonrası kısa sessizlikle) konur."""
     bosluk = S.sessizlik(0.25)
     parcalar: list[S.Dalga] = []
     simdi = 0.0
@@ -148,3 +149,34 @@ def yamala(metin: str, ses: S.Dalga, uret: Callable[[str], S.Dalga], esik: float
         simdi = kes.t1
     parcalar.append(ses[int(simdi * S.SR):])
     return np.concatenate(parcalar)
+
+
+def yamala(metin: str, ses: S.Dalga, uret: Callable[[str], S.Dalga], esik: float, *,
+           bildir: Callable[[str], None] = print,
+           kelime_zamanlari: Callable[[S.Dalga], list[KelimeZamani]] = S.kelime_zamanlari) -> S.Dalga | None:
+    """`uret` bir metni seslendiren istektir (gemini.GeminiTTS.uret); TTSHatasi fırlatırsa onarım yapılamamış sayılır,
+    KotaDoldu ise yukarı iletilir."""
+    duy = kelime_zamanlari(ses)
+    cumle = cumleler(metin)
+    hedef, hangi = _kelimeler(cumle)
+    if hedef != sade_kelimeler(metin) or not duy:
+        return None
+    eslesme = _eslestir(hedef, duy)
+    dinleme = _Dinleme(duy, len(ses) / S.SR)
+    bolgeler, atilacak = _eksik_ve_fazla(eslesme, hedef, hangi, dinleme)
+    kesim = _kesimler(bolgeler, hangi, eslesme[1], dinleme, cumle)
+    if kesim is None:
+        return None
+    kesim += [_Kesim(t0, t1) for t0, t1 in atilacak if not any(k.t0 <= t0 < k.t1 for k in kesim)]
+    yazilar = [k.yazi for k in kesim if k.yazi]
+    if not kesim or sum(len(x) for x in yazilar) > EN_COK_YAMA_KR:
+        return None
+    if yazilar:
+        sesler = _yamayi_oku(yazilar, uret, esik, bildir, kelime_zamanlari)
+        if sesler is None:
+            return None
+        for kes, parca in zip([k for k in kesim if k.yazi], sesler, strict=True):
+            kes.ses = parca
+    else:
+        bildir(f"   yama: yalnız {len(kesim)} fazla okuma kesildi (istek harcanmadı)")
+    return _birlestir(ses, kesim)
