@@ -13,17 +13,27 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import Callable
+from collections.abc import Callable
 
 from .yollar import Yollar
+from .durum import DurumDeposu
+from .hazirlik import kuyruk, okunacak_mi
+from .katalog import Katalog
+from .kontrol import KontrolSonucu
+from .teslim import gecerli_teslim
+from .kota import kota_gunu
+from .olcum import BOSA_GIDEN, istek_ozeti
+from .kilit import ZatenCalisiyor, tek_kopya
+from .zamanlayici import ARACLAR, kur
+from .isci import IsTanimi, oku_eser
+from .kontrol import kontrol_et
+from .teslim import TeslimDurumu, teslim_et
+from . import ceviri
+from .hazirlik import metni_hazirla
+from . import site
 
 
 def _durum(y: Yollar, _a: argparse.Namespace) -> int:
-    from .durum import DurumDeposu
-    from .hazirlik import kuyruk, okunacak_mi
-    from .katalog import Katalog
-    from .kontrol import KontrolSonucu
-    from .teslim import gecerli_teslim
 
     k = Katalog.yukle(y)
     d = DurumDeposu(y.durum).oku()
@@ -43,8 +53,6 @@ def _durum(y: Yollar, _a: argparse.Namespace) -> int:
             durum += f"; kontrol %{kontrol.eslesme:.2f} {'geçti' if kontrol.gecti else 'GEÇMEDİ'}"
         print(f"{e.no:>3}  {e.eser[:42]:<42} {durum}")
     print("\nKuyruk (kısadan uzuna):", ", ".join(f"{i.ad} ({i.uzunluk:,} kr)" for i in kuyruk(k, y)) or "boş")
-    from .kota import kota_gunu
-    from .olcum import BOSA_GIDEN, istek_ozeti
     gun = kota_gunu()
     o = istek_ozeti(y.istek_defteri, gun)
     harcanan = o.get("ses", 0) + sum(o.get(x, 0) for x in BOSA_GIDEN)
@@ -56,8 +64,6 @@ def _durum(y: Yollar, _a: argparse.Namespace) -> int:
 
 
 def _oku(y: Yollar, a: argparse.Namespace) -> int:
-    from .kilit import ZatenCalisiyor, tek_kopya
-    from .zamanlayici import ARACLAR, kur
     kotalar = {ARACLAR[0].model: a.lite, ARACLAR[1].model: a.flash, ARACLAR[2].model: a.k31}
     try:
         with tek_kopya(y.zamanlayici_kilidi):  # iki kopya aynı eseri aynı anda okuyup kotayı iki kez yakmasın
@@ -69,7 +75,6 @@ def _oku(y: Yollar, a: argparse.Namespace) -> int:
 
 
 def _oku_eser(y: Yollar, a: argparse.Namespace) -> int:
-    from .isci import IsTanimi, oku_eser
     is_ = IsTanimi(ad=a.ad, arac_adi=a.arac_adi, model=a.model, ses=a.ses,
                    ortak=tuple(m for m in (a.ortak or "").split(",") if m), hedef_sn=a.hedef_sn,
                    sabit_blok=a.sabit_blok)
@@ -77,15 +82,12 @@ def _oku_eser(y: Yollar, a: argparse.Namespace) -> int:
 
 
 def _kontrol(y: Yollar, a: argparse.Namespace) -> int:
-    from .kontrol import kontrol_et
     s = kontrol_et(y.fola_klasoru(a.ad), y.parcalar)
     print(s.ozet().split("\n\n", 1)[-1] if s.bloklar else "blok yok")
     return 0 if s.gecti else 1
 
 
 def _teslim(y: Yollar, a: argparse.Namespace) -> int:
-    from .katalog import Katalog
-    from .teslim import TeslimDurumu, teslim_et
     k = Katalog.yukle(y)
     eserler = [k.al(a.ad)] if a.ad else k.etkinler()
     hata = 0
@@ -102,7 +104,6 @@ def _teslim(y: Yollar, a: argparse.Namespace) -> int:
 
 
 def _ceviri(y: Yollar, a: argparse.Namespace) -> int:
-    from . import ceviri
     paragraf, kelime = ceviri.yaz(a.ad, y)
     ses = y.eser_klasoru(a.ad) / "seslendirme-metni.txt"
     print(f"paragraf: {paragraf} | kelime: {kelime:,}")
@@ -113,14 +114,11 @@ def _ceviri(y: Yollar, a: argparse.Namespace) -> int:
 
 
 def _hazirla(y: Yollar, a: argparse.Namespace) -> int:
-    from .hazirlik import metni_hazirla
-    from .katalog import Katalog
     print(metni_hazirla(Katalog.yukle(y).al(a.ad), y))
     return 0
 
 
 def _site(y: Yollar, a: argparse.Namespace) -> int:
-    from . import site
     katalog, yakinda = site.hazirla(y, kuru=a.kuru)
     if a.kuru:
         print(f"{len(katalog)} eser yayında olurdu; Yakında: {', '.join(x['id'] for x in yakinda['yakinda']) or 'boş'}")

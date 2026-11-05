@@ -7,7 +7,7 @@ import subprocess
 import traceback
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Callable
+from collections.abc import Callable
 
 from . import gemini as G
 from .ayar import gerekli
@@ -28,7 +28,7 @@ class Cikis(IntEnum):
     BOLUNEMEZ = 78    # model tek paragraflık bloğa ses döndürmüyor: bu araç bu eseri okuyamaz
 
     @classmethod
-    def koddan(cls, kod: int) -> "Cikis":
+    def koddan(cls, kod: int) -> Cikis:
         try:
             return cls(kod)
         except ValueError:

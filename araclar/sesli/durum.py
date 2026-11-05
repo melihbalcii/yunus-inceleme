@@ -20,7 +20,8 @@ import os
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
+from collections.abc import Iterator
 
 UYARLAMALI = "uyarlamali"
 SABIT = "eski"
@@ -37,7 +38,7 @@ class Durum:
     _bilinmeyen: dict[str, Any] = field(default_factory=dict, repr=False)  # elle eklenmiş alanlar korunur
 
     @classmethod
-    def sozlukten(cls, veri: dict[str, Any]) -> "Durum":
+    def sozlukten(cls, veri: dict[str, Any]) -> Durum:
         bilinen = {"atama", "ortak", "ret", "yontem", "onarim", "oncelik"}
         return cls(atama=dict(veri.get("atama", {})), ortak={k: list(v) for k, v in veri.get("ortak", {}).items()},
                    ret={k: list(v) for k, v in veri.get("ret", {}).items()}, yontem=dict(veri.get("yontem", {})),

@@ -6,6 +6,8 @@ import json
 import time
 from pathlib import Path
 from typing import Any
+import datetime as dt
+from .kota import kota_gunu
 
 VARSAYILAN_HIZ = 14.5  # kr/sn, ölçüm yoksa
 
@@ -55,9 +57,7 @@ harcamaz."""
 
 def istek_ozeti(defter: Path, gun: str) -> dict[str, int]:
     """Kota günü `gun` içinde atılan isteklerin sonuçlarına göre sayısı ({"ses": 9, "kayip": 1, …})."""
-    import datetime as dt
 
-    from .kota import kota_gunu
     sayac: dict[str, int] = {}
     for k in oku(defter):
         try:

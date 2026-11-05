@@ -22,7 +22,7 @@ import datetime as dt
 import json
 import time
 from dataclasses import dataclass, field
-from typing import Callable
+from collections.abc import Callable
 
 from . import olcum
 from .durum import SABIT, UYARLAMALI, Durum, DurumDeposu
@@ -35,6 +35,7 @@ from .kontrol import KontrolSonucu
 from .metin import SABIT_BLOK as SABIT_VARSAYILAN
 from .teslim import TeslimDurumu, teslim_et
 from .yollar import Yollar
+from .kota import kota_gunu
 
 GUNLUK_ISTEK = 10
 VARSAYILAN_HEDEF = 570   # sn; ölçüm yokken bir isteğin hedef ses süresi
@@ -69,7 +70,7 @@ class AracDurumu:
 
 
 def _aile(model: str) -> str:
-    return model.split("-tts")[0].rsplit("-", 2)[0]
+    return model.split("-tts", maxsplit=1)[0].rsplit("-", 2)[0]
 
 
 def hedef_sn(model: str, yollar: Yollar) -> int:
@@ -187,7 +188,6 @@ def gercek_bagimliliklar(yollar: Yollar) -> Bagimliliklar:
 
 def bosa_giden(yollar: Yollar) -> int:
     """Bugünkü kota gününde kotayı harcayıp ses getirmeyen istek sayısı (kayıp, zaman aşımı, boş, ret, hata)."""
-    from .kota import kota_gunu
     sayac = olcum.istek_ozeti(yollar.istek_defteri, kota_gunu())
     return sum(n for sonuc, n in sayac.items() if sonuc not in ("ses", "gitmedi", "sinir"))
 

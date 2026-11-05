@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Iterator
+from collections.abc import Iterator
 
 from .yollar import Yollar
 
@@ -54,7 +54,7 @@ class Katalog:
             self._no[e.no] = e
 
     @classmethod
-    def yukle(cls, yollar: Yollar | None = None, dosya: Path | None = None) -> "Katalog":
+    def yukle(cls, yollar: Yollar | None = None, dosya: Path | None = None) -> Katalog:
         dosya = dosya or (yollar or Yollar.varsayilan()).eserler
         try:
             ham = json.loads(dosya.read_text(encoding="utf-8"))["eserler"]

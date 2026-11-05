@@ -10,7 +10,7 @@ import fcntl
 import os
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from collections.abc import Iterator
 
 
 class ZatenCalisiyor(Exception):

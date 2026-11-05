@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import difflib
 from dataclasses import dataclass
-from typing import Callable, Sequence
+from collections.abc import Callable, Sequence
 
 import numpy as np
 
 from . import ses as S
 from .karsilastir import atlamalar, kayip_mi, sade_kelimeler
 from .metin import cumleler
+from .gemini import BosYanit, GuvenlikReddi
 
 EN_COK_YER = 4
 EN_COK_YAMA_KR = 4000
@@ -55,7 +56,6 @@ def yamala(metin: str, ses: S.Dalga, uret: Callable[[str], S.Dalga], esik: float
            kelime_zamanlari: Callable[[S.Dalga], list[KelimeZamani]] = S.kelime_zamanlari) -> S.Dalga | None:
     """`uret` bir metni seslendiren istektir (gemini.GeminiTTS.uret); TTSHatasi fırlatırsa onarım yapılamamış sayılır,
     KotaDoldu ise yukarı iletilir."""
-    from .gemini import BosYanit, GuvenlikReddi
 
     duy = kelime_zamanlari(ses)
     cumle = cumleler(metin)

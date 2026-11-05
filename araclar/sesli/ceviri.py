@@ -72,7 +72,7 @@ class CeviriAyari:
     ceviri_basligi: str = ""
 
     @classmethod
-    def oku(cls, dosya: Path) -> "CeviriAyari":
+    def oku(cls, dosya: Path) -> CeviriAyari:
         try:
             v = json.loads(dosya.read_text(encoding="utf-8"))
             return cls(bolum_sayisi=int(v["bolum_sayisi"]), giris=v["giris"], kapanis=tuple(v["kapanis"]),

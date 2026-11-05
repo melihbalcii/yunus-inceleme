@@ -9,8 +9,8 @@ from __future__ import annotations
 import difflib
 import re
 
-_BIR = "sıfır bir iki üç dört beş altı yedi sekiz dokuz".split()
-_ON = ",on,yirmi,otuz,kırk,elli,altmış,yetmiş,seksen,doksan".split(",")
+_BIR = ["sıfır", "bir", "iki", "üç", "dört", "beş", "altı", "yedi", "sekiz", "dokuz"]
+_ON = ["", "on", "yirmi", "otuz", "kırk", "elli", "altmış", "yetmiş", "seksen", "doksan"]
 
 
 def sayi(n: int | str) -> str:
@@ -44,9 +44,7 @@ OKUNAMAZ = set(sade_kelimeler("Fınglui mıglunaf Kutulu Rılyeh vğanagıl ftag
 UYDURMA = re.compile(r"(Altyazı M\.?K\.?|İzlediğiniz için teşekkür ederim\.?|Abone olmayı unutmayın\.?"
                      r"|Bu dizinin betimlemesi[^.]*\.)", re.I)
 
-_SIRA = [x.replace("_", " ") for x in (
-    "birinci ikinci üçüncü dördüncü beşinci altıncı yedinci sekizinci dokuzuncu onuncu on_birinci on_ikinci on_üçüncü "
-    "on_dördüncü on_beşinci on_altıncı on_yedinci on_sekizinci on_dokuzuncu yirminci").split()]
+_SIRA = [x.replace("_", " ") for x in ["birinci", "ikinci", "üçüncü", "dördüncü", "beşinci", "altıncı", "yedinci", "sekizinci", "dokuzuncu", "onuncu", "on_birinci", "on_ikinci", "on_üçüncü", "on_dördüncü", "on_beşinci", "on_altıncı", "on_yedinci", "on_sekizinci", "on_dokuzuncu", "yirminci"]]
 
 
 def sira_sozcuk(s: str) -> str:

@@ -11,6 +11,9 @@ from typing import Any, TypeAlias
 
 import numpy as np
 import numpy.typing as npt
+import soundfile as sf
+import lameenc
+from .karsilastir import duyulani_arit, sade_kelimeler
 
 Dalga: TypeAlias = npt.NDArray[np.float32]
 """Ses dizisi: tek kanal, [-1, 1] aralığında float32."""
@@ -31,14 +34,12 @@ def sessizlik(sn: float) -> Dalga:
 # FFmpeg'i istiyor; o bağımlılık böylece gerekmez (torch güvenlik güncellemesi, kalite/HATA-DEFTERI.md H-007).
 
 def wav_oku(yol: Path) -> Dalga:
-    import soundfile as sf
     ses, _ = sf.read(str(yol), dtype="float32", always_2d=True)
     return np.ascontiguousarray(ses[:, 0])
 
 
 def wav_yaz(yol: Path, ses: Dalga) -> None:
     """16 bit PCM; önce geçici dosyaya yazılıp yerine taşınır, yarım dosya önbelleğe girmez."""
-    import soundfile as sf
     gecici = yol.with_name(yol.stem + ".yaziliyor.wav")
     sf.write(str(gecici), ses, SR, subtype="PCM_16", format="WAV")
     gecici.replace(yol)
@@ -59,7 +60,6 @@ def kirp(ses: Dalga) -> Dalga:
 
 
 def mp3_yaz(yol: Path, ses: Dalga, kbps: int = 128) -> None:
-    import lameenc
     ses = ses / max(1e-6, float(np.abs(ses).max())) * 0.89
     enc = lameenc.Encoder()
     enc.set_bit_rate(kbps)
@@ -85,7 +85,6 @@ def dok(ses: Dalga, sr: int = SR, onceki_metne_bagli: bool = False) -> str:
 def kelime_zamanlari(ses: Dalga) -> list[tuple[str, float, float]]:
     """[(sade kelime, başlangıç sn, bitiş sn)]."""
     import mlx_whisper
-    from .karsilastir import duyulani_arit, sade_kelimeler
     w = yeniden_ornekle(ses, SR, 16000)
     sonuc = mlx_whisper.transcribe(w, path_or_hf_repo=WHISPER, language="tr", condition_on_previous_text=False,
                                    word_timestamps=True)

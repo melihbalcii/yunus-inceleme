@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 
 from . import ses as S
 from .karsilastir import harf_eslesmesi, kelimeler, olcum
@@ -57,7 +57,7 @@ class KontrolSonucu:
         _yaz(klasor / "kontrol.txt", self.ozet())
 
     @classmethod
-    def oku(cls, klasor: Path) -> "KontrolSonucu | None":
+    def oku(cls, klasor: Path) -> KontrolSonucu | None:
         try:
             veri = json.loads((klasor / "kontrol.json").read_text(encoding="utf-8"))
             return cls(eslesme=float(veri["eslesme"]), bloklar=[BlokRaporu(**b) for b in veri["bloklar"]])

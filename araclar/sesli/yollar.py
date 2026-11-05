@@ -20,13 +20,13 @@ class Yollar:
     cop: Path            # silme yok: eskiyen teslim kopyaları buraya taşınır
 
     @classmethod
-    def varsayilan(cls) -> "Yollar":
+    def varsayilan(cls) -> Yollar:
         ev = Path.home()
         return cls(kok=PROJE_KOKU, teslim=ev / "Desktop" / "sesli kitap fola", emel_teslim=ev / "Desktop" / "sesli kitap",
                    yayin=ev / "Library" / "Caches" / "melihten-dinle" / "yayin", cop=ev / ".Trash")
 
     @classmethod
-    def kok_altinda(cls, kok: Path) -> "Yollar":
+    def kok_altinda(cls, kok: Path) -> Yollar:
         return cls(kok=kok, teslim=kok / "teslim", emel_teslim=kok / "emel-teslim", yayin=kok / "yayin", cop=kok / "cop")
 
     # --- proje içi ---

@@ -14,6 +14,7 @@ from pathlib import Path
 from .katalog import Eser
 from .kontrol import KontrolSonucu
 from .yollar import Yollar
+from mutagen.id3 import COMM, ID3, TALB, TCON, TIT2, TLAN, TPE1, TYER
 
 YENILENECEK = {"Gemini 3.8 Live", "Gemini 2.5 Flash"}  # bu klasörlerdeki kayıtlar teslim sayılmaz (ses kalitesi)
 
@@ -85,7 +86,6 @@ def teslim_et(eser: Eser, yollar: Yollar) -> TeslimSonucu:
 
 
 def kunye_yaz(mp3: Path, eser: Eser, arac_adi: str, ses_adi: str) -> None:
-    from mutagen.id3 import COMM, ID3, TALB, TCON, TIT2, TLAN, TPE1, TYER
     k = ID3()
     k.add(TIT2(encoding=3, text=eser.eser))
     k.add(TPE1(encoding=3, text=eser.yazar))

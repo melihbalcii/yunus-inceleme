@@ -6,7 +6,13 @@ target-version = "py311"
 include = ["sesli/**/*.py", "sesli_kitap.py"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "B", "C90", "UP", "SIM", "PL"]
+select = ["E", "F", "W", "B", "C90", "UP", "SIM", "PL", "TID253"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+# Ağır kütüphaneler (açılışı saniyeler sürer, bellek tutar) yalnız gerektikleri işlevde yüklenir: CLI'nin "durum"
+# gibi komutları ve testler bunları hiç yüklemeden çalışır. TID253 bunu zorunlu kılar; bu modüllerin işlev içi
+# yüklenmesi PLC0415 sayılmaz (ruff belgesi). Hafif kütüphaneler ve iç modüller dosya başında yüklenir.
+banned-module-level-imports = ["torch", "torchaudio", "mlx_whisper", "google.genai", "httpx"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10

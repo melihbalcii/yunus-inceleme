@@ -20,7 +20,8 @@ import shutil
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 from .ayar import env_oku
 from .durum import DurumDeposu
@@ -28,6 +29,8 @@ from .hazirlik import kuyruk
 from .katalog import Katalog, KatalogHatasi
 from .teslim import YENILENECEK
 from .yollar import Yollar
+import lameenc
+import soundfile as sf
 
 Plan = dict[int, dict[str, str]]  # yol haritası CSV'si: eser no → sütunlar (Köken, Ülke, …)
 
@@ -90,8 +93,6 @@ def cerceveler(veri: bytes) -> list[Cerceve]:
 
 def kodla(mp3: Path, kbps: int = KBPS) -> tuple[bytes, float]:
     """MP3'ü akış hâlinde açıp yeniden kodlar (6,8 saatlik eser belleğe sığmaz); (baytlar, saniye)."""
-    import lameenc
-    import soundfile as sf
     bilgi = sf.info(str(mp3))
     e = lameenc.Encoder()
     e.set_bit_rate(kbps)

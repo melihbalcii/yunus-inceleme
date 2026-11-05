@@ -22,7 +22,8 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
+from collections.abc import Callable
 
 import numpy as np
 
@@ -33,6 +34,8 @@ from .gemini import USLUP, BosYanit, GeciciHata, GuvenlikReddi, TTSHatasi
 from .kota import kota_gunu
 from .karsilastir import olcum as blok_olcumu
 from .yollar import Yollar
+from .yama import yamala as varsayilan_yama
+from .gemini import KotaDoldu
 
 ESIK = 0.95         # Whisper eşleşmesi (harf düzeyinde); altındaki blok yeniden okutulur
 DENEME = 3
@@ -177,8 +180,7 @@ class Okuyucu:
         self._olc = olc or (lambda metin, ses: blok_olcumu(metin, S.dok(ses)))
         self._kalite = kalite
         if yamala is None:
-            from .yama import yamala as _y
-            yamala = _y
+            yamala = varsayilan_yama
         self._yamala = yamala
         self._gun = gun
 
@@ -255,7 +257,6 @@ class Okuyucu:
         return d
 
     def _yamayi_dene(self, depo: DenemeDeposu, metin: str, ses: S.Dalga, etiket: str) -> S.Dalga | None:
-        from .gemini import KotaDoldu
         try:  # yama tek istektir: yanıtı kaybolursa tekrar edilmez
             onarilmis = self._yamala(metin, ses, lambda m: self._iste(depo, m, 1), ESIK, self.bildir)
         except KotaDoldu:
