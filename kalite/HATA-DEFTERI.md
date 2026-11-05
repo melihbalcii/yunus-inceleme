@@ -120,7 +120,9 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
   kütüphanelerini (ör. 186 MB libtorch_cpu) Mac'ten kaldırıp yalnız iCloud'da bırakmış. Yeniden başlatmadan sonra
   iCloud indirmesi ilerlemedi: torch'u yükleyen her komut (okuma, test) uyarı vermeden sonsuza kadar bekledi.
   Aynı durumda 113.925 dosya / 19,1 GB (teslim MP3'leri, `.cache/huggingface` modeli) var.
-- **Tür denetimi:** Planlı: `haftalik_denetim.py` okuma ortamında ve modelde yalnız iCloud'da duran dosya var mı
-  bakacak, varsa alarm verecek. Çözüm: Finder'da `.venv-ses`, `.cache/huggingface`, `araclar` için
-  "Her zaman bu Mac'te tut" (kullanıcı yapacak).
-- **Durum:** Açık.
+- **Tür denetimi:** `haftalik_denetim.py` artık okuma ortamında (`.venv-ses`, `.cache/python`, `.cache/huggingface`,
+  `araclar`) yalnız iCloud'da duran dosya var mı bakıyor, varsa alarm veriyor (`test_haftalik_denetim`, 3 test). İlk
+  çalıştırmada benim elle çıkardığım listede olmayan `.cache/python`'u (Python'un kendisi) yakaladı.
+- **Çözüm:** Finder'da klasöre sağ tıkla → "İndirileni Tut". Kullanıcı 6 Kasım'da üçünü işaretledi; `.cache/python`
+  eklenecek.
+- **Durum:** Denetim eklendi; indirme sürüyor.
