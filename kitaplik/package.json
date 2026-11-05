@@ -1,0 +1,13 @@
+{
+  "name": "melihten-dinle",
+  "private": true,
+  "description": "Melih'ten Dinle: arkadaşlarla paylaşılan sesli kitap sitesi (Netlify)",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"testler/*.test.ts\"",
+    "tip": "DENO_NO_PACKAGE_JSON=1 \"$HOME/Library/Preferences/netlify/deno-cli/deno\" check --allow-import=edge.netlify.com:443 netlify/edge-functions/kapi.ts netlify/lib/oturum.ts testler/kapi.test.ts"
+  },
+  "devDependencies": {
+    "netlify-cli": "^23.15.1"
+  }
+}

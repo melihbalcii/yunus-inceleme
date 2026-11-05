@@ -1,0 +1,23 @@
+# Melih'ten Dinle: arkadaşlarla paylaşılan sesli kitap sitesi (Netlify, ücretsiz plan)
+# Yayın klasörü "araclar/sesli_kitap.py site" ile Masaüstü dışında üretilir (iCloud'a 3,5 GB kopya gitmesin):
+#   ~/Library/Caches/melihten-dinle/yayin
+[build]
+  edge_functions = "netlify/edge-functions"
+
+# ses parçalarının yolunda içerik özeti var (ses/<eser>-<özet>/<n>.mp3): dosya değişirse yol da değişir,
+# bu yüzden tarayıcı bir kez indirdiğini bir yıl saklayabilir; yeniden dinlemek kotadan yemez
+[[headers]]
+  for = "/ses/*"
+  [headers.values]
+    Cache-Control = "private, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+# internetsiz dinleme betiği her açılışta güncel alınsın (yeni sürüm hemen devreye girsin)
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"

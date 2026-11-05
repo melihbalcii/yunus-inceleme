@@ -1,0 +1,394 @@
+{
+ "aciklama": "Sesli kitap eserlerinin tek listesi. durum: etkin (okunur, teslim edilir, sitede yer alır) | vazgecildi (kullanıcı vazgeçti; dosyalara dokunulmaz, hiçbir yerde kullanılmaz) | tamamlanmadi (metni tam değil). yalniz_fola: Emel'li kopyası yok, doğrudan Fola'ya okutulur. siir: paragraf içi satır sonları korunur.",
+ "eserler": [
+  {
+   "ad": "kasagi",
+   "no": 1,
+   "eser": "Kaşağı",
+   "yazar": "Ömer Seyfettin",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "forsa",
+   "no": 2,
+   "eser": "Forsa",
+   "yazar": "Ömer Seyfettin",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "pembe-incili-kaftan",
+   "no": 3,
+   "eser": "Pembe İncili Kaftan",
+   "yazar": "Ömer Seyfettin",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "diyet",
+   "no": 4,
+   "eser": "Diyet",
+   "yazar": "Ömer Seyfettin",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "yalniz-efe",
+   "no": 5,
+   "eser": "Yalnız Efe",
+   "yazar": "Ömer Seyfettin",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "kurk-mantolu-madonna",
+   "no": 11,
+   "eser": "Kürk Mantolu Madonna",
+   "yazar": "Sabahattin Ali",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "orhan-veli-siirler",
+   "no": 28,
+   "eser": "Bütün Şiirleri",
+   "yazar": "Orhan Veli Kanık",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": true
+  },
+  {
+   "ad": "tevfik-fikret-siirler",
+   "no": 29,
+   "eser": "Tevfik Fikret'ten Şiirler",
+   "yazar": "Tevfik Fikret",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": true
+  },
+  {
+   "ad": "mehmet-akif-safahat",
+   "no": 30,
+   "eser": "Safahat",
+   "yazar": "Mehmet Akif Ersoy",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": true
+  },
+  {
+   "ad": "dede-korkut",
+   "no": 31,
+   "eser": "Dede Korkut Hikâyeleri",
+   "yazar": "Anonim",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": true
+  },
+  {
+   "ad": "nasreddin-letaif",
+   "no": 32,
+   "eser": "Nasreddin Hoca Fıkraları",
+   "yazar": "Anonim",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "keloglan-masallari",
+   "no": 33,
+   "eser": "Keloğlan Masalları",
+   "yazar": "Anonim",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "insan-ne-ile-yasar",
+   "no": 34,
+   "eser": "İnsan Ne İle Yaşar",
+   "yazar": "Lev Tolstoy",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "bir-insana-ne-kadar-toprak-gerekir",
+   "no": 35,
+   "eser": "Bir İnsana Ne Kadar Toprak Gerekir",
+   "yazar": "Lev Tolstoy",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "ivan-ilyicin-olumu",
+   "no": 36,
+   "eser": "İvan İlyiç'in Ölümü",
+   "yazar": "Lev Tolstoy",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "efendi-ile-usagi",
+   "no": 37,
+   "eser": "Efendi ile Uşağı",
+   "yazar": "Lev Tolstoy",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "poe-anlatan-yurek-kara-kedi",
+   "no": 60,
+   "eser": "Anlatan Yürek ve Kara Kedi",
+   "yazar": "Edgar Allan Poe",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "poe-usher-evinin-cokusu",
+   "no": 61,
+   "eser": "Usher Evinin Çöküşü",
+   "yazar": "Edgar Allan Poe",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "lovecraft-cthulhunun-cagrisi",
+   "no": 62,
+   "eser": "Cthulhu'nun Çağrısı",
+   "yazar": "H. P. Lovecraft",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "stevenson-jekyll-hyde",
+   "no": 63,
+   "eser": "Dr. Jekyll ile Bay Hyde",
+   "yazar": "Robert Louis Stevenson",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "wilde-mutlu-prens",
+   "no": 67,
+   "eser": "Mutlu Prens ve Diğer Masallar",
+   "yazar": "Oscar Wilde",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "dickens-noel-sarkisi",
+   "no": 68,
+   "eser": "Bir Noel Şarkısı",
+   "yazar": "Charles Dickens",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "melville-katip-bartleby",
+   "no": 72,
+   "eser": "Katip Bartleby",
+   "yazar": "Herman Melville",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "london-vahsetin-cagrisi",
+   "no": 73,
+   "eser": "Vahşetin Çağrısı",
+   "yazar": "Jack London",
+   "durum": "etkin",
+   "yalniz_fola": true,
+   "siir": false
+  },
+  {
+   "ad": "london-beyaz-dis",
+   "no": 74,
+   "eser": "Beyaz Diş",
+   "yazar": "Jack London",
+   "durum": "etkin",
+   "yalniz_fola": true,
+   "siir": false,
+   "not": "4 Kasım: İngilizce aslından (Gutenberg 910) çevrildi"
+  },
+  {
+   "ad": "carroll-alis",
+   "no": 75,
+   "eser": "Alis Harikalar Diyarında",
+   "yazar": "Lewis Carroll",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "wells-zaman-makinesi",
+   "no": 76,
+   "eser": "Zaman Makinesi",
+   "yazar": "H. G. Wells",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "conrad-karanligin-yuregi",
+   "no": 77,
+   "eser": "Karanlığın Yüreği",
+   "yazar": "Joseph Conrad",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "ohenry-muneccimlerin-armagani",
+   "no": 78,
+   "eser": "Müneccimlerin Armağanı ve Diğer Öyküler",
+   "yazar": "O. Henry",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "cibran-ermis",
+   "no": 79,
+   "eser": "Ermiş",
+   "yazar": "Halil Cibran",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "hugo-idam-mahkumunun-son-gunu",
+   "no": 80,
+   "eser": "Bir İdam Mahkûmunun Son Günü",
+   "yazar": "Victor Hugo",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "maupassant-gerdanlik",
+   "no": 81,
+   "eser": "Gerdanlık ve Diğer Öyküler",
+   "yazar": "Guy de Maupassant",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "voltaire-candide",
+   "no": 86,
+   "eser": "Candide",
+   "yazar": "Voltaire",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "kafka-donusum",
+   "no": 87,
+   "eser": "Dönüşüm",
+   "yazar": "Franz Kafka",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "zweig-bilinmeyen-kadinin-mektubu",
+   "no": 88,
+   "eser": "Bilinmeyen Bir Kadının Mektubu",
+   "yazar": "Stefan Zweig",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "goethe-genc-werther",
+   "no": 90,
+   "eser": "Genç Werther'in Acıları",
+   "yazar": "Johann Wolfgang von Goethe",
+   "durum": "vazgecildi",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "akutagawa-rasomon-bambu-korulukta",
+   "no": 94,
+   "eser": "Raşomon ve Bambu Korulukta",
+   "yazar": "Ryunosuke Akutagawa",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "mevlana-mesnevi-hikayeler",
+   "no": 96,
+   "eser": "Mesnevi'den Hikâyeler",
+   "yazar": "Mevlânâ",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "ezop-masallari",
+   "no": 97,
+   "eser": "Ezop Masalları",
+   "yazar": "Ezop",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "seneca-hayatin-kisaligi",
+   "no": 99,
+   "eser": "Hayatın Kısalığı Üzerine",
+   "yazar": "Seneca",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "suntzu-savas-sanati",
+   "no": 100,
+   "eser": "Savaş Sanatı",
+   "yazar": "Sun Tzu",
+   "durum": "etkin",
+   "yalniz_fola": false,
+   "siir": false
+  },
+  {
+   "ad": "gazali-dilin-afetleri",
+   "no": 101,
+   "eser": "Dilin Âfetleri",
+   "yazar": "İmam Gazâlî",
+   "durum": "etkin",
+   "yalniz_fola": true,
+   "siir": false
+  },
+  {
+   "ad": "london-martin-eden",
+   "no": 102,
+   "eser": "Martin Eden",
+   "yazar": "Jack London",
+   "durum": "etkin",
+   "yalniz_fola": true,
+   "siir": false,
+   "not": "4 Kasım: İngilizce aslından (Gutenberg 1056) çevrildi"
+  }
+ ]
+}
