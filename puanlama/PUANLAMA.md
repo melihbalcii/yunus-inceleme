@@ -66,3 +66,14 @@ ruff kural kümesi: `E, F, W, B, C90, UP, SIM, PL` (satır sınırı 120). Küme
 - Testler bu ölçümlere göre "ayarlanmaz": bir mutasyonu öldürmek için yazılan test gerçek bir davranışı sınamalıdır.
   `pragma: no mutate` ve kapsam dışı bırakma yorumları her kullanımda gerekçesiyle `puanlama/ISTISNALAR.md`'ye yazılır.
 - Araç sürümleri `araclar/gereksinimler-olcum.txt` ve `kitaplik/package.json`'da sabittir.
+
+## Açıklamalar (5 Kasım 2026, ilk puan hesaplanmadan önce eklendi)
+
+- **axe "ihlal" sayısı:** Etkilenen öğe başına sayılır (bir kural 20 öğede bozulduysa 20 ihlal). Kural başına sayım
+  daha yumuşak olurdu; axe sonucu bu açıklamadan önce görüldüğü için sert olan yorum seçildi.
+- **npm audit:** Sitenin çalışırken kullandığı paketler (`npm audit --omit=dev`). Ölçüm ve yayın araçları
+  (Lighthouse, Stryker, netlify-cli) siteye girmez. pip-audit de yalnız `araclar/gereksinimler.txt`'i (üretim
+  sisteminin kütüphaneleri) tarar.
+- **Lighthouse kategori puanı:** Her sayfa 3 kez ölçülür, ortanca alınır; iki sayfanın ortalaması kullanılır.
+- **Mutasyon puanında zaman aşımı:** Stryker'ın ve mutmut'un "timeout" sonucu öldürülmüş sayılır (iki aracın da
+  varsayılanı).
