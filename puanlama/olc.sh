@@ -131,7 +131,7 @@ if adim tarayici; then
   baslik "ön yüz tarayıcı testleri (Chromium)"
   [ -z "$testler" ] && testler=true
   npm run --silent test:tarayici 2>&1 | grep -E "^ℹ (tests|pass|fail)" || true
-  npm run --silent test:tarayici >/dev/null 2>&1 || testler=false
+  KAPSAM_DOSYASI="$S/kapsam-on-yuz.json" npm run --silent test:tarayici >/dev/null 2>&1 || testler=false
 fi
 
 if adim npm-audit; then
@@ -146,7 +146,12 @@ fi
 
 if adim on-yuz; then
   baslik "Lighthouse + axe"
-  (cd public && "$PY" -m http.server 8765 >/dev/null 2>&1) &
+  # gerçek sayfa ölçülsün: site örnek bir eser listesiyle yayınlanır (eser listesi yoksa boş sayfa ölçülürdü)
+  olcum_kok="$(mktemp -d)"
+  cp -R public/. "$olcum_kok/"
+  cp olcum/ornek-katalog.json "$olcum_kok/katalog.json"
+  cp olcum/ornek-yakinda.json "$olcum_kok/yakinda.json"
+  (cd "$olcum_kok" && "$PY" -m http.server 8765 >/dev/null 2>&1) &
   sunucu=$!
   sleep 2
   rm -rf "$S/lighthouse" .lighthouseci

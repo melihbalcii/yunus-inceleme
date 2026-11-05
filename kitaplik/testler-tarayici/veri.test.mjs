@@ -5,6 +5,7 @@ import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
+import { writeFileSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
@@ -26,6 +27,9 @@ const GECERLI = {
 const KOTU = '"><img src=x onerror="window.__xss=1">';
 
 let sunucu, adres, tarayici;
+// Ön yüz test kapsamı (puanlama "Ön yüz test kapsamı"): KAPSAM_DOSYASI verilirse Chromium'un kod kapsamıyla
+// uygulama.js'in testlerde çalışan satır oranı yazılır.
+const kapsamlar = [];
 before(async () => {
   sunucu = createServer(async (istek, yanit) => {
     const yol = decodeURIComponent(new URL(istek.url, "http://x").pathname);
@@ -46,17 +50,45 @@ before(async () => {
 after(async () => {
   await tarayici?.close();
   sunucu?.close();
+  if (process.env.KAPSAM_DOSYASI) writeFileSync(process.env.KAPSAM_DOSYASI, JSON.stringify(satirKapsami(kapsamlar)));
 });
+
+// V8 blok kapsamı → satır kapsamı: bir satır, boş olmayan bir karakteri çalıştıysa kapsanmış sayılır.
+function satirKapsami(girdiler) {
+  if (!girdiler.length) return null;
+  const kaynak = girdiler[0].source;
+  const calisti = new Uint8Array(kaynak.length);
+  for (const g of girdiler) {
+    const sayim = new Int32Array(kaynak.length).fill(-1);
+    const araliklar = g.functions.flatMap((f) => f.ranges).sort((a, b) => (b.endOffset - b.startOffset) - (a.endOffset - a.startOffset));
+    for (const a of araliklar) sayim.fill(a.count, a.startOffset, a.endOffset);
+    for (let i = 0; i < sayim.length; i++) if (sayim[i] > 0) calisti[i] = 1;
+  }
+  let toplam = 0, kapsanan = 0, i = 0;
+  for (const satir of kaynak.split("\n")) {
+    if (satir.trim()) {
+      toplam++;
+      for (let j = 0; j < satir.length; j++) if (satir[j].trim() && calisti[i + j]) { kapsanan++; break; }
+    }
+    i += satir.length + 1;
+  }
+  return { satir: Math.round((1000 * kapsanan) / toplam) / 10, kapsanan, toplam };
+}
 
 async function sayfa(depo) {
   const baglam = await tarayici.newContext({ serviceWorkers: "block" });
   const p = await baglam.newPage();
+  await p.coverage.startJSCoverage({ resetOnNavigation: false });
   const hatalar = [];
   p.on("pageerror", (h) => hatalar.push(String(h)));
   if (depo !== undefined) await p.addInitScript((d) => localStorage.setItem("kitaplik-v1", JSON.stringify(d)), depo);
   await p.goto(`${adres}/index.html`);
   await p.waitForFunction(() => document.querySelector("#icerik")?.innerHTML.length > 0);
-  return { p, hatalar, kapat: () => baglam.close() };
+  const kapat = async () => {
+    kapsamlar.push(...(await p.coverage.stopJSCoverage()).filter((x) => x.url.endsWith("/uygulama.js")));
+    await baglam.close();
+  };
+  return { p, hatalar, kapat };
 }
 
 async function butunSayfalariGez(p) {

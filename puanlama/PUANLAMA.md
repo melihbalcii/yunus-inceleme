@@ -97,3 +97,11 @@ Dayanıklılık alt ölçümleri: gerçek ağ arızası (Toxiproxy, `testler/tes
 `testler/test_cokme.py`) %35, rastgele hata sırası (Hypothesis + başvuru modeli, `testler/test_dayaniklilik.py`) %30.
 Her biri geçen test ÷ toplam; atlanan test (ör. Toxiproxy yok) geçmemiş sayılır. Bu alan "sınama yapılıyor ve
 geçiyor" der; testlerin gücünü mutasyon puanı (Doğruluk) ölçer. Her rapor v1 formülüyle hesaplanan puanı da yazar.
+
+### Ölçüm düzeltmeleri — 6 Kasım 2026 (formül aynı)
+- **axe ve Lighthouse gerçek sayfayı ölçer:** site artık örnek bir eser listesiyle (`kitaplik/olcum/ornek-katalog.json`,
+  kurgusal 3 eser) yayınlanıp ölçülür. Önceden eser listesi olmadan açılıyordu: kullanıcının hiç görmediği boş sayfa
+  ölçülüyordu ("ana başlık yok" uyarısı ve kontrast bulguları o boş sayfadandı).
+- **Ön yüz test kapsamı ölçülür:** tarayıcı testleri (`kitaplik/testler-tarayici/`) Chromium'un kod kapsamıyla
+  çalışır; `uygulama.js`'in testlerde çalışan satır oranı `kapsam-on-yuz.json`'a yazılır. Önceden hiç ölçülmüyor,
+  "ön yüz testi yok" diye 0 sayılıyordu.
