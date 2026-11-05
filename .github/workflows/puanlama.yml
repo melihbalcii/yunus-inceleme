@@ -7,6 +7,8 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  schedule:
+    - cron: "7 6 * * 1"   # her pazartesi 06:07 UTC = 09:07 Türkiye: kod değişmese de yeni açıklar ve puan
 
 permissions:
   contents: read
@@ -47,6 +49,7 @@ jobs:
       contents: read
       security-events: write   # CodeQL sonuçları Security sekmesine
       actions: read
+      issues: write            # haftalık rapor kaydı
     steps:
       - uses: actions/checkout@v7.0.0
         with:
@@ -139,3 +142,25 @@ jobs:
         with:
           name: puanlama-sonuclari
           path: puanlama/sonuclar/
+
+      - name: Haftalık rapor kaydı
+        if: always() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - > haftalik.md <<'EOF'
+          import json
+          try:
+              p = json.load(open("puanlama/sonuclar/puan.json"))
+          except OSError:
+              print("Bu hafta puan hesaplanamadı; ayrıntı için çalıştırma günlüğüne bakın."); raise SystemExit
+          print(f"**Puan: {p['toplam']} / 100 — {p['sonuc']}**\n")
+          for a in p["alanlar"]:
+              print(f"- {a['ad']}: {a['puan']} / {a['agirlik']}")
+          print("\n**Kesin şartlar**")
+          for k in p["kesin"]:
+              print(f"- {'✅' if k['durum'] else ('➖' if k['durum'] is None else '❌')} {k['ad']} {k['ek']}")
+          EOF
+          echo "" >> haftalik.md
+          echo "Çalıştırma: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> haftalik.md
+          gh issue create --title "Haftalık kalite raporu $(date +%d.%m.%Y)" --body-file haftalik.md
