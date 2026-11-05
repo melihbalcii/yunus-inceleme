@@ -7,7 +7,7 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
 
 | Ay | Bizden önce başkasının bulduğu | Araçların bulduğu | Bizim bulduğumuz |
 |---|---|---|---|
-| Kasım 2026 | 1 (Yunus: H-001) | 11 (H-004…H-012, H-014, H-015) | 4 (H-002, H-003, H-013, H-016) |
+| Kasım 2026 | 1 (Yunus: H-001) | 11 (H-004…H-012, H-014, H-015) | 6 (H-002, H-003, H-013, H-016, H-017, H-018) |
 
 ## Kayıtlar
 
@@ -126,3 +126,17 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
 - **Çözüm:** Finder'da klasöre sağ tıkla → "İndirileni Tut". Kullanıcı 6 Kasım'da üçünü işaretledi; `.cache/python`
   eklenecek.
 - **Durum:** Denetim eklendi; indirme sürüyor.
+
+### H-017 · İstek sırasında çöken program blok başına günlük tavanı aşabiliyordu
+- **Bulan:** Çökme testi (`testler/test_cokme.py`), 6 Kasım 2026 · **Önem:** yüksek (kota kaybı) · **Tür:** Yarıda kalma (K2)
+- **Kök neden:** Blok sayacı istek BİTTİKTEN sonra diske yazılıyordu. İstek sürerken süreç ölürse (elektrik, kill -9,
+  yeniden başlatma) sayaç hiç artmıyordu: üst üste 7 çökmede 7 istek gitti, tavan 4.
+- **Düzeltme:** Bütçe istekten ÖNCE harcanmış sayılıp yazılır, harcanmayan kısmı sonra iade edilir. Çökmede sayaç
+  fazla sayar (güvenli yön). **Tür denetimi:** gerçek süreç öldürülerek yapılan çökme testi. **Durum:** Düzeltildi.
+
+### H-018 · Gelen ses ölçülürken program çökerse ses kayboluyordu
+- **Bulan:** Çökme testi, 6 Kasım 2026 · **Önem:** yüksek (H-002'nin kalan parçası) · **Tür:** Yarıda kalma (K2, K3)
+- **Kök neden:** Gemini'den gelen ses önce Whisper ile ölçülüyor (dakikalar), ancak sonra diske yazılıyordu. Bu arada
+  çökme olursa ses kayboluyor, kota boşa gidiyor, ertesi açılışta aynı blok yeniden isteniyordu.
+- **Düzeltme:** Ses gelir gelmez "bekleyen" olarak diske yazılır; açılışta önce bekleyenler ölçülür, yeni istek atılmaz.
+- **Tür denetimi:** çökme testi (ölçüm anında öldürme). **Durum:** Düzeltildi.

@@ -102,7 +102,8 @@ class Deneme:
 class DenemeDeposu:
     """Bir bloğun bitmemiş denemeleri: <özet>.deneme-N.wav ve <özet>.denemeler.json (ölçümler, bugünkü istek
     sayısı). Blok tamamlanınca silinir. İstek sayısı kota günü değişince sıfırlanır (bağlantı kesintisi bloğu kalıcı
-    kilitlemesin)."""
+    kilitlemesin). Gelen ses ölçülmeden önce "bekleyen" olarak yazılır: ölçüm sürerken süreç ölürse ses kaybolmaz,
+    yeniden açılışta ölçülür (H-018)."""
 
     def __init__(self, klasor: Path, ozet: str, gun: Callable[[], str] = kota_gunu):
         self.klasor, self.ozet, self._gun = klasor, ozet, gun
@@ -114,39 +115,55 @@ class DenemeDeposu:
             except ValueError:
                 veri = {}
         self.denemeler = [x for d in veri.get("denemeler", []) if (x := self._deneme(d)) is not None]
+        self.bekleyen = [d for d in veri.get("bekleyen", []) if self._gecerli(d) and (klasor / d).exists()]
         self.istek = int(veri.get("istek", 0)) if veri.get("gun") == gun() else 0
         self.bolunecek = bool(veri.get("bolunecek"))  # model bu bloğa bütün olarak ses vermiyor: yarılarıyla okunur
 
+    def _gecerli(self, dosya: object) -> bool:
+        """Dosya adı kayıttan okunup açılıyor ve siliniyor: yalnız bu bloğun "<özet>.deneme-N.wav" biçimindeki adı
+        kabul edilir (CWE-22: "../" ile başka dosyaya ulaşılmasın)."""
+        bicim = rf"{re.escape(self.ozet)}\.deneme-\d{{1,2}}\.wav"
+        return isinstance(dosya, str) and re.fullmatch(bicim, dosya) is not None
+
     def _deneme(self, d: object) -> Deneme | None:
-        """Kayıttaki bir denemeyi doğrular. Dosya adı kayıttan okunup açılıyor ve siliniyor: yalnız bu bloğun
-        "<özet>.deneme-N.wav" biçimindeki adı kabul edilir (CWE-22: "../" ile başka dosyaya ulaşılmasın)."""
-        if not isinstance(d, dict) or not isinstance(d.get("dosya"), str):
-            return None
-        if not re.fullmatch(rf"{re.escape(self.ozet)}\.deneme-\d{{1,2}}\.wav", d["dosya"]):
+        if not isinstance(d, dict) or not self._gecerli(d.get("dosya")):
             return None
         try:
-            deneme = Deneme(d["dosya"], float(d["oran"]), [str(x) for x in d["eksik"]], float(d["bas"]), float(d["son"]))
+            deneme = Deneme(d["dosya"], float(d["oran"]), [str(x) for x in d["eksik"]],
+                            float(d["bas"]), float(d["son"]))
         except (KeyError, TypeError, ValueError):
             return None
         return deneme if (self.klasor / deneme.dosya).exists() else None
 
-    def ses(self, d: Deneme) -> S.Dalga:
-        return S.wav_oku(self.klasor / d.dosya)
+    def oku(self, dosya: str) -> S.Dalga:
+        return S.wav_oku(self.klasor / dosya)
 
-    def ekle(self, ses: S.Dalga, oran: float, eksik: list[str], bas: float, son: float) -> Deneme:
-        d = Deneme(f"{self.ozet}.deneme-{len(self.denemeler) + 1}.wav", oran, eksik, bas, son)
-        S.wav_yaz(self.klasor / d.dosya, ses)
+    def ses(self, d: Deneme) -> S.Dalga:
+        return self.oku(d.dosya)
+
+    def sakla(self, ses: S.Dalga) -> str:
+        """Gelen sesi ölçmeden önce diske yazar; adı döner."""
+        dosya = f"{self.ozet}.deneme-{len(self.denemeler) + len(self.bekleyen) + 1}.wav"
+        S.wav_yaz(self.klasor / dosya, ses)
+        self.bekleyen.append(dosya)
+        self.kaydet()
+        return dosya
+
+    def ekle(self, dosya: str, oran: float, eksik: list[str], bas: float, son: float) -> Deneme:
+        d = Deneme(dosya, oran, eksik, bas, son)
+        if dosya in self.bekleyen:
+            self.bekleyen.remove(dosya)
         self.denemeler.append(d)
         self.kaydet()
         return d
 
     def kaydet(self) -> None:
         _json_yaz(self._kayit, {"gun": self._gun(), "istek": self.istek, "bolunecek": self.bolunecek,
-                                "denemeler": [vars(d) for d in self.denemeler]})
+                                "denemeler": [vars(d) for d in self.denemeler], "bekleyen": self.bekleyen})
 
     def temizle(self) -> None:
-        for d in self.denemeler:
-            (self.klasor / d.dosya).unlink(missing_ok=True)
+        for dosya in [d.dosya for d in self.denemeler] + self.bekleyen:
+            (self.klasor / dosya).unlink(missing_ok=True)
         self._kayit.unlink(missing_ok=True)
 
 
@@ -171,15 +188,19 @@ class Okuyucu:
         return DenemeDeposu(self.yollar.parcalar, blok_ozeti(metin, self.ayar.model, self.ayar.ses), self._gun)
 
     def _iste(self, depo: DenemeDeposu, metin: str, en_cok: int) -> S.Dalga:
-        """Bütçe içinde tek seslendirme çağrısı; harcanan istekler bloğun bugünkü sayacına (diske) yazılır."""
+        """Bütçe içinde tek seslendirme çağrısı. Bütçe istekten ÖNCE harcanmış sayılıp diske yazılır, harcanmayan
+        kısmı sonra iade edilir: istek sürerken süreç ölürse sayaç fazla sayar, eksik saymaz (H-017)."""
         kalan = BLOK_TAVANI - depo.istek
         if kalan < 1:
             raise GeciciHata(f"blok için bugün {BLOK_TAVANI} istek harcandı; yeni istek atılmıyor")
+        ayrilan = min(en_cok, kalan)
+        depo.istek += ayrilan
+        depo.kaydet()
         once = self.tts.atilan
         try:
-            return self.tts.uret(metin, en_cok=min(en_cok, kalan))
+            return self.tts.uret(metin, en_cok=ayrilan)
         finally:
-            depo.istek += self.tts.atilan - once
+            depo.istek -= ayrilan - min(ayrilan, self.tts.atilan - once)
             depo.kaydet()
 
     def seslendir(self, metin: str, etiket: str) -> S.Dalga:
@@ -188,6 +209,9 @@ class Okuyucu:
         depo = self._depo(metin)
         if depo.bolunecek:
             return self._bolerek(metin, etiket)
+        for dosya in list(depo.bekleyen):
+            self.bildir(f"{etiket} ölçülmeden kalmış okuma ölçülüyor (yeni istek yok): {dosya}")
+            self._degerlendir(depo, metin, dosya, depo.oku(dosya), etiket)
         for d in depo.denemeler:
             self.bildir(f"{etiket} kayıtlı deneme kullanılıyor: {d.dosya} (eşleşme {d.oran:.3f})")
             if d.iyi:
@@ -205,18 +229,10 @@ class Okuyucu:
                 if depo.denemeler:
                     break  # bugünkü bütçe bitti: eldeki en iyi deneme tutulur
                 raise
-            oran, eksik = self._olc(metin, ses)
-            k_bas, k_son = self._kalite(ses)
-            d = depo.ekle(ses, oran, eksik, k_bas, k_son)
-            no = len(depo.denemeler)
-            olcum.yaz(self.yollar.olcum, self.ayar.model, kr=len(metin), sn=round(len(ses) / S.SR, 1),
-                      oran=round(oran, 4), iyi=d.iyi, atlama=len(eksik), kalite=[round(k_bas, 2), round(k_son, 2)])
-            self.bildir(f"{etiket} {len(metin)} kr, {len(ses) / S.SR:.0f} sn, eşleşme {oran:.3f}, "
-                        f"ses kalitesi {k_bas:.1f}→{k_son:.1f}" + (f", ATLAMA: {eksik}" if eksik else "")
-                        + (", SES BOZULUYOR" if d.bozuk else "") + ("" if d.iyi else f" (deneme {no}/{self.ayar.deneme})"))
+            d = self._degerlendir(depo, metin, depo.sakla(ses), ses, etiket)
             if d.iyi:
                 return ses
-            if not d.bozuk and oran >= YAMA_ESIGI and depo.istek < BLOK_TAVANI:
+            if not d.bozuk and d.oran >= YAMA_ESIGI and depo.istek < BLOK_TAVANI:
                 onarilmis = self._yamayi_dene(depo, metin, ses, etiket)
                 if onarilmis is not None:
                     return onarilmis
@@ -224,6 +240,19 @@ class Okuyucu:
             raise GeciciHata(f"blok için bugün {BLOK_TAVANI} istek harcandı, ses alınamadı")
         en_iyi = max(depo.denemeler, key=lambda d: d.puan)  # eşik tutmasa da en iyisi; kontrol raporu gösterir
         return depo.ses(en_iyi)
+
+    def _degerlendir(self, depo: DenemeDeposu, metin: str, dosya: str, ses: S.Dalga, etiket: str) -> Deneme:
+        """Diske yazılmış bir okumayı ölçer ve deneme olarak kaydeder (istek atmaz)."""
+        oran, eksik = self._olc(metin, ses)
+        k_bas, k_son = self._kalite(ses)
+        d = depo.ekle(dosya, oran, eksik, k_bas, k_son)
+        no = len(depo.denemeler)
+        olcum.yaz(self.yollar.olcum, self.ayar.model, kr=len(metin), sn=round(len(ses) / S.SR, 1),
+                  oran=round(oran, 4), iyi=d.iyi, atlama=len(eksik), kalite=[round(k_bas, 2), round(k_son, 2)])
+        self.bildir(f"{etiket} {len(metin)} kr, {len(ses) / S.SR:.0f} sn, eşleşme {oran:.3f}, "
+                    f"ses kalitesi {k_bas:.1f}→{k_son:.1f}" + (f", ATLAMA: {eksik}" if eksik else "")
+                    + (", SES BOZULUYOR" if d.bozuk else "") + ("" if d.iyi else f" (deneme {no}/{self.ayar.deneme})"))
+        return d
 
     def _yamayi_dene(self, depo: DenemeDeposu, metin: str, ses: S.Dalga, etiket: str) -> S.Dalga | None:
         from .gemini import KotaDoldu
