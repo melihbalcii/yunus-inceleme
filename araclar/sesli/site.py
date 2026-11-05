@@ -38,6 +38,9 @@ PARCA_SINIRI = 9 * 2**20
 NETLIFY_SINIRI = 10 * 2**20
 KBPS = 64
 ESZAMANLI = 4  # 8 GB bellekte güvenli kodlama süreci sayısı
+SURE_TOLERANSI = 0.5  # sn; parçaların toplamı kaynaktan bu kadar sapabilir
+# MP3 çerçeve başlığı (ISO 11172-3): senkron bitleri, MPEG-1 sürüm kodu, ayrılmış örnekleme kodu, tek kanal kodu
+SENK, SENK_MASKE, MPEG1, AYRILMIS_ORNEK, TEK_KANAL = 0xFF, 0xE0, 3, 3, 3
 
 # MPEG ses çerçevesi başlığı tabloları (Layer III)
 _BIT = {1: [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320],
@@ -70,23 +73,23 @@ def cerceveler(veri: bytes) -> list[Cerceve]:
             i += 128
             continue
         b1, b2 = veri[i + 1], veri[i + 2]
-        if veri[i] != 0xFF or (b1 & 0xE0) != 0xE0 or (b1 >> 1) & 3 != 1:
+        if veri[i] != SENK or (b1 & SENK_MASKE) != SENK_MASKE or (b1 >> 1) & 3 != 1:
             i += 1
             continue
         surum = (b1 >> 3) & 3  # 3: MPEG-1, 2: MPEG-2, 0: MPEG-2.5
         bi, si, dolgu = b2 >> 4, (b2 >> 2) & 3, (b2 >> 1) & 1
-        if surum == 1 or bi in (0, 15) or si == 3:
+        if surum == 1 or bi in (0, 15) or si == AYRILMIS_ORNEK:
             i += 1
             continue
         hz = _ORNEK[surum][si]
-        bit = _BIT[1 if surum == 3 else 2][bi] * 1000
-        uzun = (144 if surum == 3 else 72) * bit // hz + dolgu
+        bit = _BIT[1 if surum == MPEG1 else 2][bi] * 1000
+        uzun = (144 if surum == MPEG1 else 72) * bit // hz + dolgu
         if i + uzun > n:
             break
-        tek = (veri[i + 3] >> 6) == 3
-        yan = (17 if tek else 32) if surum == 3 else (9 if tek else 17)
+        tek = (veri[i + 3] >> 6) == TEK_KANAL
+        yan = (17 if tek else 32) if surum == MPEG1 else (9 if tek else 17)
         if veri[i + 4 + yan:i + 8 + yan] not in (b"Xing", b"Info"):
-            sonuc.append(Cerceve(i, uzun, 1152 if surum == 3 else 576, hz))
+            sonuc.append(Cerceve(i, uzun, 1152 if surum == MPEG1 else 576, hz))
         i += uzun
     return sonuc
 
@@ -136,7 +139,7 @@ def parcala(mp3: Path, klasor: Path) -> str:
     veri, saniye = kodla(mp3)
     sureler = bol(veri, klasor)
     # süre kaynağın süresini tutmalı (kodlayıcı başa/sona birkaç ms ekler): parça kaybı varsa yayın yapılmasın
-    if abs(sum(sureler) - saniye) > 0.5:
+    if abs(sum(sureler) - saniye) > SURE_TOLERANSI:
         shutil.rmtree(klasor)
         raise SiteHatasi(f"parçaların süresi tutmuyor: {mp3.name} {sum(sureler):.1f} != {saniye:.1f}")
     (klasor / "bilgi.json").write_text(json.dumps({"sureler": sureler, "boyut": len(veri)}))
@@ -227,7 +230,8 @@ def _json_yaz(yol: Path, veri: object) -> None:
     gecici.replace(yol)
 
 
-def hazirla(yollar: Yollar, bildir: Callable[[str], None] = print, kuru: bool = False) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def hazirla(yollar: Yollar, bildir: Callable[[str], None] = print,
+            kuru: bool = False) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Yayın klasörünü günceller. kuru=True: hiçbir şey yazmaz, yalnız katalog ve yakında içeriğini hesaplar (ses
     parçaları zaten hazır olmalı)."""
     katalog = Katalog.yukle(yollar)

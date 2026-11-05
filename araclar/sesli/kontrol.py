@@ -18,6 +18,8 @@ from .karsilastir import harf_eslesmesi, kelimeler, olcum
 
 ESLESME_ESIGI = 97.0
 DUSUK = 0.90
+RAPOR_ESIGI = 0.95   # raporda ayrıca sayılır
+IKINCI_DINLEME_EN_AZ_KELIME = 8
 IKINCI_DINLEME = 0.9  # kapsama bunun altındaysa Whisper bir parçayı atlamış olabilir: öbür kipte bir daha dinlenir
 
 
@@ -67,7 +69,7 @@ class KontrolSonucu:
     def ozet(self) -> str:
         s = [f"[{b.no}/{len(self.bloklar)}] {b.oran:.3f}" for b in self.bloklar]
         s += ["", f"PARAGRAF {len(self.bloklar)} | harf düzeyinde eşleşme %{self.eslesme:.2f}",
-              f"0,95 altı: {sum(b.oran < 0.95 for b in self.bloklar)} | 0,90 altı: {self.dusuk}"]
+              f"0,95 altı: {sum(b.oran < RAPOR_ESIGI for b in self.bloklar)} | 0,90 altı: {self.dusuk}"]
         s += [f"ATLAMA #{no}: «{a}»" for no, a in self.atlamalar]
         s += [f"KAPSAMA DÜŞÜK #{b.no} %{100 * b.kapsama:.0f} (metnin bu kadarı seste duyuldu)"
               for b in sorted(self.bloklar, key=lambda b: b.kapsama)[:5] if b.kapsama < IKINCI_DINLEME]
@@ -99,7 +101,7 @@ def kontrol_et(fola: Path, parcalar: Path, bildir: Callable[[str], None] = print
         duyulan = dokum(anahtar, dosya, False)
         oran, eslesen, harf = harf_eslesmesi(p["metin"], duyulan)
         # Whisper uzun blokta bazen bir parçayı atlıyor (ses tam olduğu hâlde): öbür kipte bir daha dinlet
-        if eslesen / max(1, harf) < IKINCI_DINLEME and len(kelimeler(p["metin"])) > 8:
+        if eslesen / max(1, harf) < IKINCI_DINLEME and len(kelimeler(p["metin"])) > IKINCI_DINLEME_EN_AZ_KELIME:
             ikinci = dokum(anahtar + "|2", dosya, True)
             o2, e2, _ = harf_eslesmesi(p["metin"], ikinci)
             if e2 > eslesen:

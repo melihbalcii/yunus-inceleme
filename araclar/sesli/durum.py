@@ -100,7 +100,8 @@ class DurumDeposu:
 
     @contextmanager
     def degistir(self) -> Iterator[Durum]:
-        """with depo.degistir() as d: ...  — blok hatasız biterse değişiklik yazılır, hata olursa hiçbir şey yazılmaz."""
+        """with depo.degistir() as d: ...  — blok hatasız biterse değişiklik yazılır, hata olursa hiçbir şey
+        yazılmaz."""
         with self._kilitli():
             d = self._oku()
             yield d

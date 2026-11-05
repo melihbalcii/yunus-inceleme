@@ -10,6 +10,10 @@ import datetime as dt
 from .kota import kota_gunu
 
 VARSAYILAN_HIZ = 14.5  # kr/sn, ölçüm yoksa
+HIZ_OLCUM_EN_KISA_SN = 60  # daha kısa okumanın hızı güvenilir değil
+HIZ_EN_AZ_ORNEK = 3
+BASARI_EN_AZ_ORNEK = 5
+VARSAYILAN_BASARI = 0.8
 
 
 def oku(dosya: Path) -> list[dict[str, Any]]:
@@ -39,13 +43,13 @@ def yaz(dosya: Path, model: str, **alanlar: object) -> None:
 def model_hizi(dosya: Path, model: str) -> float:
     """Modelin son 40 başarılı ve bir dakikadan uzun denemesinin okuma hızı medyanı (kr/sn)."""
     h = sorted([x["kr"] / x["sn"] for x in oku(dosya)
-                if x.get("model") == model and x.get("iyi") and x.get("sn", 0) > 60][-40:])
-    return h[len(h) // 2] if len(h) >= 3 else VARSAYILAN_HIZ
+                if x.get("model") == model and x.get("iyi") and x.get("sn", 0) > HIZ_OLCUM_EN_KISA_SN][-40:])
+    return h[len(h) // 2] if len(h) >= HIZ_EN_AZ_ORNEK else VARSAYILAN_HIZ
 
 
 def basari_orani(dosya: Path, model: str) -> float:
     son = [x for x in oku(dosya) if x.get("model") == model and not x.get("yama")][-40:]
-    return sum(1 for x in son if x.get("iyi")) / len(son) if len(son) >= 5 else 0.8
+    return sum(1 for x in son if x.get("iyi")) / len(son) if len(son) >= BASARI_EN_AZ_ORNEK else VARSAYILAN_BASARI
 
 
 # --- istek defteri (.tmp/istek-defteri.jsonl, gemini.GeminiTTS yazar) ---

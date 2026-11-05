@@ -23,8 +23,7 @@ class ZatenCalisiyor(Exception):
 def tek_kopya(yol: Path) -> Iterator[None]:
     """Kilidi alır, blok bitince bırakır. Kilit başka süreçteyse beklemez: ZatenCalisiyor."""
     yol.parent.mkdir(parents=True, exist_ok=True)
-    f = open(yol, "a+", encoding="utf-8")
-    try:
+    with open(yol, "a+", encoding="utf-8") as f:  # kilit, dosya kapanınca kendiliğinden bırakılır
         try:
             fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
@@ -35,5 +34,3 @@ def tek_kopya(yol: Path) -> Iterator[None]:
         f.write(str(os.getpid()))
         f.flush()
         yield
-    finally:
-        f.close()  # kilit dosyayla birlikte bırakılır

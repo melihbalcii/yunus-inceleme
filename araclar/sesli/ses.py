@@ -22,6 +22,7 @@ SR = 24000
 WHISPER = "mlx-community/whisper-large-v3-turbo"
 # SQUIM PESQ tahmini: temiz 3.8 blokları 3,2-3,8; bozulan 2.5 blokları sonda 1,3-2,0 (29 Ekim ölçümü)
 KALITE_SINIR = 2.6
+SESSIZLIK_ESIGI = 0.02  # tam ölçekli genlik; altı sessizlik sayılır
 KALITE_DUSUS = 1.0  # bloğun başı ile sonu arası bu kadar düşerse ses giderek bozuluyor demektir
 
 
@@ -55,7 +56,7 @@ def yeniden_ornekle(ses: Dalga, kaynak_hz: int, hedef_hz: int) -> Dalga:
 
 def kirp(ses: Dalga) -> Dalga:
     """Baştaki ve sondaki sessizliği atar (kısa pay bırakarak)."""
-    dolu = np.flatnonzero(np.abs(ses) > 0.02)
+    dolu = np.flatnonzero(np.abs(ses) > SESSIZLIK_ESIGI)
     return ses[max(0, dolu[0] - int(SR * 0.05)):dolu[-1] + int(SR * 0.1)] if len(dolu) else ses
 
 
@@ -102,7 +103,8 @@ def _squim() -> Any:
 
 def kalite(ses: Dalga) -> tuple[float, float]:
     """Referanssız konuşma kalitesi (torchaudio SQUIM, PESQ tahmini): her 30 sn'den 5 sn'lik örnek; (baş, son)
-    ortalamaları. Kelimeler doğru olduğu hâlde giderek bozulan sesi (2.5 Flash, Raşomon) Whisper göremiyor, bu görüyor."""
+    ortalamaları. Kelimeler doğru olduğu hâlde giderek bozulan sesi (2.5 Flash, Raşomon) Whisper göremiyor, bu
+    görüyor."""
     import torch
     x = torch.from_numpy(yeniden_ornekle(ses, SR, 16000))
     puan = []

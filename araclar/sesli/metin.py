@@ -46,8 +46,7 @@ def sabit_bloklar(yazi: str, siir: bool = False, en_cok: int | None = None) -> l
     sinir = -(-toplam // -(-toplam // sinir)) + 200
     sonuc: list[str] = []
     birikim: list[str] = []
-    for ham in yazi.split("\n\n"):
-        ham = ham.strip()
+    for ham in (x.strip() for x in yazi.split("\n\n")):
         if not ham:
             continue
         p = _arit(ham, siir)
@@ -65,8 +64,7 @@ def sabit_bloklar(yazi: str, siir: bool = False, en_cok: int | None = None) -> l
 def paragraflar(yazi: str, siir: bool = False, en_cok: int = UZUN_PARAGRAF) -> list[Paragraf]:
     """Uyarlamalı plan için arıtılmış paragraflar; en_cok'tan uzun paragraf cümle sınırından parçalanır."""
     sonuc: list[Paragraf] = []
-    for ham in yazi.split("\n\n"):
-        ham = ham.strip().replace(YUMUSAK_TIRE, "")
+    for ham in (x.strip().replace(YUMUSAK_TIRE, "") for x in yazi.split("\n\n")):
         if not ham:
             continue
         p = _arit(ham, siir)

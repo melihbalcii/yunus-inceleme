@@ -10,15 +10,16 @@ import difflib
 import re
 
 _BIR = ["sıfır", "bir", "iki", "üç", "dört", "beş", "altı", "yedi", "sekiz", "dokuz"]
+ON, YUZ = 10, 100
 _ON = ["", "on", "yirmi", "otuz", "kırk", "elli", "altmış", "yetmiş", "seksen", "doksan"]
 
 
 def sayi(n: int | str) -> str:
     """Sayının okunuşu: 1915 → "bin dokuz yüz on beş"."""
     n = int(n)
-    if n < 10:
+    if n < ON:
         return _BIR[n]
-    if n < 100:
+    if n < YUZ:
         return (_ON[n // 10] + ("" if n % 10 == 0 else " " + _BIR[n % 10])).strip()
     for b, ad in ((10**6, "milyon"), (1000, "bin"), (100, "yüz")):
         if n >= b:
@@ -44,13 +45,17 @@ OKUNAMAZ = set(sade_kelimeler("Fınglui mıglunaf Kutulu Rılyeh vğanagıl ftag
 UYDURMA = re.compile(r"(Altyazı M\.?K\.?|İzlediğiniz için teşekkür ederim\.?|Abone olmayı unutmayın\.?"
                      r"|Bu dizinin betimlemesi[^.]*\.)", re.I)
 
-_SIRA = [x.replace("_", " ") for x in ["birinci", "ikinci", "üçüncü", "dördüncü", "beşinci", "altıncı", "yedinci", "sekizinci", "dokuzuncu", "onuncu", "on_birinci", "on_ikinci", "on_üçüncü", "on_dördüncü", "on_beşinci", "on_altıncı", "on_yedinci", "on_sekizinci", "on_dokuzuncu", "yirminci"]]
+_SIRA = [x.replace("_", " ") for x in [
+    "birinci", "ikinci", "üçüncü", "dördüncü", "beşinci", "altıncı", "yedinci", "sekizinci", "dokuzuncu", "onuncu",
+    "on_birinci", "on_ikinci", "on_üçüncü", "on_dördüncü", "on_beşinci", "on_altıncı", "on_yedinci", "on_sekizinci",
+    "on_dokuzuncu", "yirminci"]]
+KAYIP_EN_AZ_KELIME, KAYIP_EN_AZ_HARF = 3, 10
 
 
 def sira_sozcuk(s: str) -> str:
     """Whisper "4. Bölüm" yazar, metinde "Dördüncü bölüm" vardır."""
     return re.sub(r"\b(\d{1,2})\.\s*(?=[Bb]ölüm|[Kk]ısım|[Bb]oy|[Mm]asal|[Öö]ykü)",
-                  lambda m: _SIRA[int(m.group(1)) - 1] + " " if 0 < int(m.group(1)) <= 20 else m.group(0), s)
+                  lambda m: _SIRA[int(m.group(1)) - 1] + " " if 0 < int(m.group(1)) <= len(_SIRA) else m.group(0), s)
 
 
 def duyulani_arit(duyulan: str) -> str:
@@ -64,7 +69,7 @@ def kayip_mi(metin_parcasi: list[str], duyulan_parca: list[str]) -> bool:
     es = sum(x.size for x in difflib.SequenceMatcher(None, a, b, autojunk=False).get_matching_blocks()) if b else 0
     if sum(k in OKUNAMAZ for k in metin_parcasi) * 3 >= len(metin_parcasi) * 2:
         return False
-    return len(metin_parcasi) - len(duyulan_parca) >= 3 and len(a) - es >= 10
+    return len(metin_parcasi) - len(duyulan_parca) >= KAYIP_EN_AZ_KELIME and len(a) - es >= KAYIP_EN_AZ_HARF
 
 
 def atlamalar(hedef: list[str], duy: list[str]) -> list[str]:

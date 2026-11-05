@@ -18,6 +18,7 @@ Kurallar (kullanıcının 26 Ekim – 4 Kasım 2026 kararları):
 """
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import json
 import time
@@ -126,7 +127,8 @@ def sec(araclar: list[AracDurumu], durum: Durum, boy: dict[str, int]) -> tuple[A
         if atanan:
             return a, atanan[0]
         if not a.arac.sabit_blok:
-            onc = [e for e in durum.oncelik if e in boy and e not in durum.atama and not durum.reddedildi_mi(a.model, e)]
+            onc = [e for e in durum.oncelik
+                   if e in boy and e not in durum.atama and not durum.reddedildi_mi(a.model, e)]
             if onc:
                 return a, onc[0]
         pay = sorted(plan[a.model], key=boy.__getitem__)
@@ -203,10 +205,8 @@ def sorunlu_bloklari_sil(ad: str, yollar: Yollar) -> int:
         return 0
     kontrol = KontrolSonucu.oku(fola)
     sorunlu = set(kontrol.sorunlu_bloklar()) if kontrol else set()
-    try:
+    with contextlib.suppress(OSError, ValueError, KeyError):
         sorunlu |= {k["no"] for k in json.loads((fola / "kalite.json").read_text(encoding="utf-8")) if k["bozuk"]}
-    except (OSError, ValueError, KeyError):
-        pass
     n = 0
     for no in sorted(sorunlu):
         if no in plan and (d := yollar.parcalar / plan[no]).exists():

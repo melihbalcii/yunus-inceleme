@@ -29,6 +29,7 @@ _SIRA_EKI = {"bir": "birinci", "iki": "ikinci", "üç": "üçüncü", "dört": "
              "altı": "altıncı", "yedi": "yedinci", "sekiz": "sekizinci", "dokuz": "dokuzuncu", "on": "onuncu",
              "yirmi": "yirminci", "otuz": "otuzuncu", "kırk": "kırkıncı", "elli": "ellinci", "altmış": "altmışıncı",
              "yetmiş": "yetmişinci", "seksen": "sekseninci", "doksan": "doksanıncı"}
+SIRA_SINIRI = 100  # sıra sözcüğü 1-99 için
 _ROMA = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100}
 KISIM = re.compile(r"^## (\S+) Kısım$")
 BOLUM = re.compile(r"^### ([IVXLC]+)(?:\n(.+))?$")
@@ -47,7 +48,7 @@ def roma(s: str) -> int:
 
 def sirali(n: int) -> str:
     """1 → "Birinci", 46 → "Kırk altıncı" (1-99)."""
-    if not 0 < n < 100:
+    if not 0 < n < SIRA_SINIRI:
         raise CeviriHatasi(f"sıra sözcüğü yalnız 1-99 için: {n}")
     k = [x for x in (_ONLAR[n // 10], _BIRLER[n % 10]) if x]
     k[-1] = _SIRA_EKI[k[-1]]

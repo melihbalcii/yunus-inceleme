@@ -21,6 +21,7 @@ from .gemini import BosYanit, GuvenlikReddi
 
 EN_COK_YER = 4
 EN_COK_YAMA_KR = 4000
+FAZLA_EN_AZ_KELIME, FAZLA_EN_AZ_HARF = 4, 15  # bundan kısa fazla okuma kesilmez
 
 KelimeZamani = tuple[str, float, float]
 Eslesme = tuple[Sequence[tuple[str, int, int, int, int]], dict[int, int], list[str]]
@@ -78,7 +79,7 @@ def yamala(metin: str, ses: S.Dalga, uret: Callable[[str], S.Dalga], esik: float
                 bolgeler[-1][1] = max(bolgeler[-1][1], b)
             else:
                 bolgeler.append([a, b])
-        elif op == "insert" and j2 - j1 >= 4 and len("".join(h[j1:j2])) >= 15:
+        elif op == "insert" and j2 - j1 >= FAZLA_EN_AZ_KELIME and len("".join(h[j1:j2])) >= FAZLA_EN_AZ_HARF:
             atilacak.append((_ara_nokta(duy, j1, sure), _ara_nokta(duy, j2, sure)))
     if len(bolgeler) > EN_COK_YER:
         return None

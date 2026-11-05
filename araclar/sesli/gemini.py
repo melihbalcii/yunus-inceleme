@@ -19,6 +19,7 @@ Kota güvenliği (5 Kasım, Yunus'un incelemesi: hata durumlarında aynı iş ar
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import io
 import json
@@ -46,6 +47,7 @@ ISTEK_SURESI = 15 * 60       # sn; 19 dakikalık ses 3-6 dk'da gelir: bu süre a
 EN_UZUN_BEKLEME = 45 * 60    # sn; aynı isteğin yanıtı en çok bu kadar beklenir
 GITMEDI_DENEME = 3           # bağlanılamayan istek (kota harcanmaz) en çok bu kadar denenir
 DAKIKALIK_DENEME = 8         # dakikalık sınır (429, istek reddedilir, kota harcanmaz)
+KOTA_REDDI = 429            # HTTP: dakikalık ya da günlük sınır
 VARSAYILAN_BUTCE = 2         # kotayı harcayabilecek istek: ilk istek + yanıtı kaybolursa bir tekrar
 
 
@@ -174,7 +176,7 @@ class GeminiTTS:
                 self._uyu(30)
                 continue
             except errors.ClientError as h:
-                if h.code != 429:
+                if h.code != KOTA_REDDI:
                     raise
                 if re.search(r"per ?day|PerDay", str(h), re.I):
                     raise KotaDoldu(str(h)[:200]) from h
@@ -233,7 +235,7 @@ class GeminiTTS:
             self._yaz(metin, bas, "kayip")
             self.atilan += 1
             raise _Kayip() from h
-        if isinstance(h, errors.ClientError) and h.code == 429:
+        if isinstance(h, errors.ClientError) and h.code == KOTA_REDDI:
             self._yaz(metin, bas, "sinir")
         else:
             self._yaz(metin, bas, "hata")
@@ -243,14 +245,13 @@ class GeminiTTS:
     def _yaz(self, metin: str, bas: float, sonuc: str, ses_sn: float | None = None) -> None:
         kayit: dict[str, Any] = {
             "zaman": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(bas)), "model": self.arac.model,
-            "kr": len(metin), "ozet": hashlib.md5(metin.encode(), usedforsecurity=False).hexdigest()[:12], "sonuc": sonuc,
+            "kr": len(metin), "ozet": hashlib.md5(metin.encode(), usedforsecurity=False).hexdigest()[:12],
+            "sonuc": sonuc,
             "sn": round(self._saat() - bas, 1)}
         if ses_sn is not None:
             kayit["ses_sn"] = round(ses_sn, 1)
-        try:
+        with contextlib.suppress(OSError):  # defter yazılamadı diye okuma durmasın
             self._defter(kayit)
-        except OSError:
-            pass  # defter yazılamadı diye okuma durmasın
 
     def _yanittan_ses(self, yanit: Any, metin: str, bas: float) -> Dalga:
         aday = yanit.candidates[0] if getattr(yanit, "candidates", None) else None

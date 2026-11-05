@@ -18,6 +18,7 @@ Planlar:
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 import re
 from dataclasses import dataclass
@@ -276,20 +277,18 @@ class Okuyucu:
     def _bolunecek(self, depo: DenemeDeposu, metin: str, etiket: str) -> S.Dalga:
         # Yarıda kalırsa ertesi gün bütün blok yeniden istenmesin diye işaretlenir. Tek paragraflık blok bölünemez:
         # işaretlenmez (boş yanıt geçici olabilir; işaret kalırsa blok bir daha hiç denenmezdi).
-        if len(metin.split("\n\n")) >= 2:
+        if len(metin.split("\n\n")) > 1:
             depo.bolunecek = True
             depo.kaydet()
         return self._bolerek(metin, etiket)
 
     def _bolerek(self, metin: str, etiket: str) -> S.Dalga:
         paragraf = metin.split("\n\n")
-        if len(paragraf) < 2:
+        if len(paragraf) <= 1:
             raise BolunemezHata(f"ses üretilemedi, bölünemiyor: {metin[:80]}")
-        yari, birikim, i = sum(len(x) for x in paragraf) / 2, 0, 0
-        for i, x in enumerate(paragraf):
-            birikim += len(x)
-            if birikim >= yari:
-                break
+        yari = sum(len(x) for x in paragraf) / 2
+        birikim = list(itertools.accumulate(len(x) for x in paragraf))
+        i = next((k for k, b in enumerate(birikim) if b >= yari), len(paragraf) - 1)
         i = max(1, min(i, len(paragraf) - 1))
         self.bildir(f"{etiket} ikiye bölünüyor ({len(metin)} kr)")
         # yarılar kendi önbellek dosyalarına yazılır: sağ yarı hata verirse okunmuş sol yarı yeniden istenmez
@@ -332,14 +331,15 @@ class Okuyucu:
             metin = M.birlestir(par[i:j])
             kalan = sum(len(p.metin) for p in par[j:])
             dosya, ses = self._blok(metin, f"[{n}] blok (kalan {kalan:,} kr)")
-            if len(ses) / S.SR > 60:
+            if len(ses) / S.SR > olcum.HIZ_OLCUM_EN_KISA_SN:
                 hizlar.append(len(metin) / (len(ses) / S.SR))
             bloklar.append((dosya, metin))
             i = j
         return bloklar
 
     def _plan_oku(self, plan_dosyasi: Path, paragraf_sayisi: int) -> tuple[dict[str, Any], list[int]]:
-        """blok-plan.json'u doğrulayarak okur: (kimlik, sınırlar). Bozuk dosya programı düşürmez; uyarıyla yok sayılır."""
+        """blok-plan.json'u doğrulayarak okur: (kimlik, sınırlar). Bozuk dosya programı düşürmez; uyarıyla yok
+        sayılır."""
         if not plan_dosyasi.exists():
             return {}, []
         try:

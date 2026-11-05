@@ -58,7 +58,7 @@ class IsTanimi:
 
 def calistir(is_: IsTanimi, yollar: Yollar) -> Cikis:
     giris = yollar.kok / "araclar" / "sesli_kitap.py"
-    r = subprocess.run([str(yollar.python), "-u", str(giris), *is_.arguman()])
+    r = subprocess.run([str(yollar.python), "-u", str(giris), *is_.arguman()], check=False)  # çıkış kodu aşağıda okunur
     return Cikis.koddan(r.returncode)
 
 
