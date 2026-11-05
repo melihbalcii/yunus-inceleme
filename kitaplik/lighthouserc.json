@@ -1,0 +1,3 @@
+{ "ci": { "collect": { "url": ["http://localhost:8765/giris.html", "http://localhost:8765/index.html"], "numberOfRuns": 3,
+  "settings": { "chromeFlags": "--headless=new --no-sandbox" } },
+  "upload": { "target": "filesystem", "outputDir": "../puanlama/sonuclar/lighthouse" } } }

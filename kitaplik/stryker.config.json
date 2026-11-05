@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "mutate": ["netlify/**/*.ts"],
+  "testRunner": "command",
+  "commandRunner": { "command": "node --test testler/*.test.ts" },
+  "reporters": ["json", "clear-text"],
+  "jsonReporter": { "fileName": "../puanlama/sonuclar/stryker.json" },
+  "coverageAnalysis": "off",
+  "tempDirName": ".stryker-tmp",
+  "concurrency": 4
+}

@@ -1,0 +1,10 @@
+# Üretim sisteminin dış kütüphaneleri (Python 3.11). Sürümler çalışan ortamdan sabitlendi.
+numpy==1.26.4
+torch==2.6.0
+torchaudio==2.6.0
+lameenc==1.9.0
+google-genai==2.32.0
+httpx==0.28.1
+mutagen==1.48.1
+soundfile==0.14.0
+mlx-whisper==0.4.3; sys_platform == "darwin" and platform_machine == "arm64"

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<style>html, body { background: #000; margin: 0; color: #fff; }</style>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#000000">
+<title>Melih'ten Dinle</title>
+<link rel="icon" href="/simge.svg">
+<link rel="apple-touch-icon" href="/simge-180.png">
+<link rel="apple-touch-startup-image" href="/acilis/1320x2868.png" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/1206x2622.png" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/1284x2778.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/1242x2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/828x1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/640x1136.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Melih'ten Dinle">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="/stil.css">
+</head>
+<body>
+<main class="giris">
+  <form method="post" action="/giris">
+    <img class="giris-foto" src="/giris-foto.webp" alt="Kitap okuyan üç arkadaş" width="720" height="720">
+    <h1>Melih'ten Dinle</h1>
+    <p>Davetli arkadaşlar için sesli kitaplar.</p>
+    <label for="sifre">Şifre</label>
+    <input id="sifre" name="sifre" type="password" autocomplete="current-password" required autofocus>
+    <button type="submit">Giriş yap</button>
+    <p class="hata" id="hata" hidden>Şifre yanlış. Tekrar dene.</p>
+  </form>
+</main>
+<script>
+  if (new URLSearchParams(location.search).has("hata")) document.getElementById("hata").hidden = false;
+  // şifre gönderilince sunucu yanıtına kadar düğmede bekleme halkası: boş bekleme olmasın, iki kez de basılmasın
+  document.querySelector("form").addEventListener("submit", function () {
+    var b = this.querySelector("button");
+    b.disabled = true;
+    b.classList.add("bekliyor");
+    b.textContent = "Giriş yapılıyor…";
+    document.getElementById("hata").hidden = true;
+  });
+</script>
+</body>
+</html>

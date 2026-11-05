@@ -3,3 +3,10 @@ __pycache__/
 .mypy_cache/
 node_modules/
 .env
+# ölçüm araçlarının geçici klasörleri
+.coverage
+araclar/mutants/
+kitaplik/.stryker-tmp/
+kitaplik/.lighthouseci/
+kitaplik/reports/
+puanlama/sonuclar/

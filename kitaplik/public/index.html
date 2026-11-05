@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<style>
+/* açılış ekranı: stil dosyası ve eser listesi gelmeden önce de siyah zemin ve logo görünsün (beyaz ekran olmasın) */
+html, body { background: #000; margin: 0; }
+#acilis { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: radial-gradient(120% 80% at 50% 0%, #1f3b2b, #000 70%);
+  color: #fff; font: 600 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; transition: opacity .35s ease, visibility .35s; }
+#acilis.gitti { opacity: 0; visibility: hidden; }
+#acilis .ac-ic { display: grid; justify-items: center; gap: 14px; text-align: center; padding: 24px; }
+#acilis img { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 3px rgb(47 211 107 / .35), 0 12px 40px rgb(0 0 0 / .6); animation: ac-nabiz 1.6s ease-in-out infinite; }
+#acilis strong { font-size: 22px; font-weight: 800; letter-spacing: -.01em; }
+#acilis span { color: #a7a7a7; font-weight: 500; min-height: 1.4em; }
+#acilis .ac-cubuk { width: 160px; height: 4px; border-radius: 2px; background: #262626; overflow: hidden; }
+#acilis .ac-cubuk i { display: block; width: 40%; height: 100%; border-radius: 2px; background: #2fd36b; animation: ac-kay 1.1s ease-in-out infinite; }
+@keyframes ac-nabiz { 50% { transform: scale(1.05); } }
+@keyframes ac-kay { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) { #acilis img, #acilis .ac-cubuk i { animation: none; } }
+</style>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Melih'ten Dinle">
+<title>Melih'ten Dinle</title>
+<link rel="icon" href="/simge.svg">
+<link rel="apple-touch-icon" href="/simge-180.png">
+<!-- iPhone ana ekrandan açılınca beyaz yerine siyah, logolu ekran (2 Kasım 2026) -->
+<link rel="apple-touch-startup-image" href="/acilis/1320x2868.png" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/1206x2622.png" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/1284x2778.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/1242x2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/828x1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="/acilis/640x1136.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="/stil.css">
+</head>
+<body>
+<div id="acilis" role="status" aria-live="polite"><div class="ac-ic">
+  <img src="data:image/webp;base64,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" alt="" width="96" height="96"><strong>Melih'ten Dinle</strong>
+  <div class="ac-cubuk"><i></i></div><span id="acilis-yazi">Kitaplığın hazırlanıyor…</span></div></div>
+<script>
+  // 6 sn'de açılmazsa yavaş bağlantıyı söyle (açılış ekranı uygulama.js'te kalkar)
+  setTimeout(function () { var y = document.getElementById("acilis-yazi"); if (y) y.textContent = "Bağlantı yavaş, biraz daha sabır…"; }, 6000);
+</script>
+<div class="uygulama">
+  <aside class="kenar">
+    <div class="panel kenar-ust">
+      <a class="marka" href="#/"><img src="/simge-192.png" alt="" width="32" height="32"><span>Melih'ten Dinle</span></a>
+      <nav class="menu" aria-label="Ana menü">
+        <a href="#/" data-sekme="ana"><span data-simge="ev"></span>Ana sayfa</a>
+        <a href="#/ara" data-sekme="ara"><span data-simge="ara"></span>Ara</a>
+        <a href="#/kitapligim" data-sekme="kitapligim"><span data-simge="kitaplik"></span>Kitaplığım</a>
+      </nav>
+    </div>
+    <div class="panel kenar-alt">
+      <h2>Son dinlediklerin</h2>
+      <div id="kenar-son"></div>
+    </div>
+  </aside>
+
+  <main class="panel ana" id="ana">
+    <div id="icerik"></div>
+  </main>
+</div>
+
+<!-- alttaki çalar: masaüstünde tam çubuk, telefonda küçük şerit (dokununca tam ekran açılır) -->
+<section class="calar" id="calar" hidden aria-label="Çalar">
+  <div class="calar-sol" data-islem="tam-ac">
+    <div class="calar-kapak" id="calar-kapak"></div>
+    <div class="calar-yazi"><strong class="js-ad"></strong><span class="js-yazar"></span></div>
+  </div>
+  <div class="calar-orta">
+    <div class="dugmeler">
+      <button class="kucuk js-hiz" data-islem="hiz" aria-label="Okuma hızı">1×</button>
+      <button data-islem="geri" aria-label="15 saniye geri"><span data-simge="geri15"></span></button>
+      <button class="cal-buyuk" data-islem="calduraklat" aria-label="Çal / duraklat"><span class="i-cal" data-simge="cal"></span><span class="i-dur" data-simge="dur"></span></button>
+      <button data-islem="ileri" aria-label="30 saniye ileri"><span data-simge="ileri30"></span></button>
+      <button class="kucuk js-uyku" data-islem="uyku" aria-label="Uyku zamanlayıcısı"><span data-simge="ay"></span><b></b></button>
+    </div>
+    <div class="cubuk">
+      <span class="js-gecen">0:00</span>
+      <input class="js-konum" type="range" min="0" max="1000" value="0" aria-label="Konum">
+      <span class="js-kalan">-0:00</span>
+    </div>
+  </div>
+  <div class="calar-sag">
+    <button class="mini-cal" data-islem="calduraklat" aria-label="Çal / duraklat"><span class="i-cal" data-simge="cal"></span><span class="i-dur" data-simge="dur"></span></button>
+    <button class="imle" data-islem="imle" aria-label="Yer imi ekle" title="Yer imi ekle"><span data-simge="im"></span></button>
+    <button class="buyut" data-islem="tam-ac" aria-label="Tam ekran çalar"><span data-simge="buyut"></span></button>
+  </div>
+  <div class="mini-ilerleme"><i class="js-cizgi"></i></div>
+</section>
+
+<!-- telefon alt sekmeleri -->
+<nav class="alt-menu" aria-label="Sekmeler">
+  <a href="#/" data-sekme="ana"><span data-simge="ev"></span>Ana sayfa</a>
+  <a href="#/ara" data-sekme="ara"><span data-simge="ara"></span>Ara</a>
+  <a href="#/kitapligim" data-sekme="kitapligim"><span data-simge="kitaplik"></span>Kitaplığım</a>
+</nav>
+
+<!-- tam ekran "Şimdi çalıyor" -->
+<section class="tam" id="tam" aria-label="Şimdi çalıyor" aria-hidden="true">
+  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="tam-ust">
+    <button data-islem="tam-kapat" aria-label="Kapat"><span data-simge="asagi"></span></button>
+    <span class="tam-baslik"><span class="es" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Şimdi çalıyor</span>
+    <a class="tam-esere" id="tam-esere" href="#/" data-islem="tam-kapat" aria-label="Eser sayfası"><span data-simge="bilgi"></span></a>
+  </div>
+  <div class="tam-kapak egik" id="tam-kapak"></div>
+  <div class="tam-yazi"><strong class="js-ad"></strong><span class="js-yazar"></span></div>
+  <div class="cubuk tam-cubuk">
+    <input class="js-konum" type="range" min="0" max="1000" value="0" aria-label="Konum">
+    <div><span class="js-gecen">0:00</span><span class="js-kalan">-0:00</span></div>
+  </div>
+  <div class="dugmeler tam-dugmeler">
+    <button class="kucuk js-hiz" data-islem="hiz" aria-label="Okuma hızı">1×</button>
+    <button data-islem="geri" aria-label="15 saniye geri"><span data-simge="geri15"></span></button>
+    <button class="cal-buyuk" data-islem="calduraklat" aria-label="Çal / duraklat"><span class="i-cal" data-simge="cal"></span><span class="i-dur" data-simge="dur"></span></button>
+    <button data-islem="ileri" aria-label="30 saniye ileri"><span data-simge="ileri30"></span></button>
+    <button class="kucuk js-uyku" data-islem="uyku" aria-label="Uyku zamanlayıcısı"><span data-simge="ay"></span><b></b></button>
+  </div>
+  <div class="tam-ek"><button class="ikincil" data-islem="imle"><span data-simge="im"></span>Yer imi ekle</button>
+    <button class="ikincil" data-an-paylas><span data-simge="paylas"></span>Bu anı paylaş</button>
+    <button class="ikincil" data-islem="kart"><span data-simge="resim"></span>Hikâye kartı</button></div>
+</section>
+
+<audio id="ses" preload="metadata"></audio>
+<script src="/uygulama.js"></script>
+</body>
+</html>

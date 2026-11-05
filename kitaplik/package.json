@@ -5,9 +5,13 @@
   "type": "module",
   "scripts": {
     "test": "node --test \"testler/*.test.ts\"",
-    "tip": "DENO_NO_PACKAGE_JSON=1 \"$HOME/Library/Preferences/netlify/deno-cli/deno\" check --allow-import=edge.netlify.com:443 netlify/edge-functions/kapi.ts netlify/lib/oturum.ts testler/kapi.test.ts"
+    "tip": "DENO_NO_PACKAGE_JSON=1 \"${DENO:-$HOME/Library/Preferences/netlify/deno-cli/deno}\" check --allow-import=edge.netlify.com:443 netlify/edge-functions/kapi.ts netlify/lib/oturum.ts testler/kapi.test.ts"
   },
   "devDependencies": {
-    "netlify-cli": "^23.15.1"
+    "@axe-core/playwright": "4.14.0",
+    "@lhci/cli": "0.16.0",
+    "@stryker-mutator/core": "10.1.1",
+    "netlify-cli": "^23.15.1",
+    "playwright": "1.64.1"
   }
 }

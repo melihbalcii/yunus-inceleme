@@ -1,0 +1,49 @@
+# Ölçüm araçlarının ayarları (puanlama/PUANLAMA.md). Kural kümeleri ve sınırlar puanlamanın parçasıdır.
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+include = ["sesli/**/*.py", "sesli_kitap.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "C90", "UP", "SIM", "PL"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.coverage.run]
+branch = true
+source = ["sesli"]
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.mutmut]
+paths_to_mutate = ["sesli/"]
+tests_dir = ["testler/"]
+also_copy = ["testler/", "sesli_kitap.py"]
+pytest_add_cli_args_test_selection = ["testler/", "--ignore=testler/uyumluluk.py"]
+
+[tool.importlinter]
+root_package = "sesli"
+include_external_packages = true
+
+# Katmanlar sesli/MIMARI.md'deki tablodan: bağımlılık yalnız aşağı doğru.
+# ":" aynı katmanda birbirini kullanabilir; "|" aynı katmanda birbirinden bağımsız olmalı.
+[[tool.importlinter.contracts]]
+name = "Katmanlar: süreç > iş akışı > dış dünya > saf kurallar > veri ve ayar"
+type = "layers"
+layers = [
+    "sesli.cli : sesli.zamanlayici : sesli.isci",
+    "sesli.site : sesli.teslim : sesli.kontrol : sesli.hazirlik : sesli.okuma : sesli.yama",
+    "sesli.gemini : sesli.ses",
+    "sesli.metin | sesli.karsilastir | sesli.ceviri",
+    "sesli.yollar : sesli.ayar : sesli.katalog : sesli.durum : sesli.olcum",
+]
+
+[[tool.importlinter.contracts]]
+name = "Saf kurallar ağ, ses ve model kütüphanelerine dokunmaz"
+type = "forbidden"
+source_modules = ["sesli.metin", "sesli.karsilastir", "sesli.ceviri"]
+forbidden_modules = ["httpx", "google", "torch", "torchaudio", "mlx_whisper", "lameenc", "subprocess"]
+allow_indirect_imports = true
