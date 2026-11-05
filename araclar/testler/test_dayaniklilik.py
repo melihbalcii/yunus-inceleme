@@ -103,32 +103,39 @@ def model(sira: list[str], en_cok: int) -> Beklenen:
             return Beklenen(sonuc, cagri, atilan)
 
 
+_D = unittest.TestCase()   # karşılaştırma yardımcıları; senaryo işlevi bir test sınıfına bağlı değil
+
+
+@settings(max_examples=400, deadline=None)
+@given(sira=st.lists(st.sampled_from(TURLER), max_size=14), en_cok=st.integers(min_value=0, max_value=4))
+def her_hata_sirasinda_kota_kurallari_korunur(sira: list[str], en_cok: int) -> None:
+    istemci = SiraliIstemci(sira)
+    defter: list[dict[str, object]] = []
+    t = G.GeminiTTS(G.Arac("Deneme TTS", "deneme-model", "Fola"), "anahtar", bildir=lambda s: None,
+                    uyu=lambda s: None, istemci_kur=lambda: istemci, defter=defter.append)
+    try:
+        t.uret("metin", en_cok=en_cok)
+        sonuc = "ses"
+    except Exception as h:  # noqa: BLE001 — sonucun türü modelle karşılaştırılır
+        sonuc = type(h).__name__
+
+    # 1. değişmez kurallar
+    _D.assertLessEqual(istemci.en_cok_ayni_anda, 1, "aynı anda iki istek")
+    _D.assertLessEqual(t.atilan, en_cok, "kota harcayan istek bütçeyi aştı")
+    _D.assertEqual(len(defter), istemci.cagri, "her istek deftere tam bir kez yazılmalı")
+    harcayan = sum(1 for k in defter if k["sonuc"] not in ("gitmedi", "sinir"))
+    _D.assertEqual(harcayan, t.atilan, "defter ile sayaç uyuşmuyor")
+    if sonuc == "ses":
+        _D.assertEqual([k["sonuc"] for k in defter].count("ses"), 1)
+        _D.assertEqual(defter[-1]["sonuc"], "ses")
+
+    # 2. başvuru modeli
+    _D.assertEqual(Beklenen(sonuc, istemci.cagri, t.atilan), model(sira, en_cok))
+
+
 class RastgeleHataSirasiTesti(unittest.TestCase):
-    @settings(max_examples=400, deadline=None)
-    @given(sira=st.lists(st.sampled_from(TURLER), max_size=14), en_cok=st.integers(min_value=0, max_value=4))
-    def test_her_hata_sirasinda_kota_kurallari_korunur(self, sira: list[str], en_cok: int) -> None:
-        istemci = SiraliIstemci(sira)
-        defter: list[dict[str, object]] = []
-        t = G.GeminiTTS(G.Arac("Deneme TTS", "deneme-model", "Fola"), "anahtar", bildir=lambda s: None,
-                        uyu=lambda s: None, istemci_kur=lambda: istemci, defter=defter.append)
-        try:
-            t.uret("metin", en_cok=en_cok)
-            sonuc = "ses"
-        except Exception as h:  # noqa: BLE001 — sonucun türü modelle karşılaştırılır
-            sonuc = type(h).__name__
-
-        # 1. değişmez kurallar
-        self.assertLessEqual(istemci.en_cok_ayni_anda, 1, "aynı anda iki istek")
-        self.assertLessEqual(t.atilan, en_cok, "kota harcayan istek bütçeyi aştı")
-        self.assertEqual(len(defter), istemci.cagri, "her istek deftere tam bir kez yazılmalı")
-        harcayan = sum(1 for k in defter if k["sonuc"] not in ("gitmedi", "sinir"))
-        self.assertEqual(harcayan, t.atilan, "defter ile sayaç uyuşmuyor")
-        if sonuc == "ses":
-            self.assertEqual([k["sonuc"] for k in defter].count("ses"), 1)
-            self.assertEqual(defter[-1]["sonuc"], "ses")
-
-        # 2. başvuru modeli
-        self.assertEqual(Beklenen(sonuc, istemci.cagri, t.atilan), model(sira, en_cok))
+    def test_her_hata_sirasinda_kota_kurallari_korunur(self) -> None:
+        her_hata_sirasinda_kota_kurallari_korunur()
 
 
 if __name__ == "__main__":
