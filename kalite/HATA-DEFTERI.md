@@ -62,7 +62,9 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
 - **Düzeltme:** torch 2.13.0 (bilinen açığı olmayan ilk sürüm, OSV ile doğrulandı). torchaudio 2.9+ WAV okuma/yazma için
   TorchCodec + sistem FFmpeg istiyordu: WAV işleri soundfile'a taşındı (torchaudio 2.6 da arka planda soundfile
   kullanıyordu; gerçek bloklarla bayt bayt aynı). Ses verisi, örnekleme dönüşümü ve MP3 iki sürümde bayt bayt aynı;
-  SQUIM kalite puanı 6. ondalıkta farklı (kayıt 2 ondalık). **Durum:** Düzeltildi (iyilestirme dalı); `.venv-ses`
+  SQUIM kalite puanı 6. ondalıkta farklı (kayıt 2 ondalık). Uçtan uca: Beyaz Diş (374,8 dk) torch 2.13 ile istek
+  atmadan baştan üretildi; MP3, kalite kaydı ve plan torch 2.6 çıktısıyla (o da teslim edilenle) bayt bayt aynı,
+  metin kontrolü %99,5. **Durum:** Düzeltildi; `.venv-ses`
   6. adımda kodla birlikte güncellenecek.
 
 ### H-008 · Yayın aracında rollup açığı
