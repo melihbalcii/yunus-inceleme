@@ -7,7 +7,7 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
 
 | Ay | Bizden önce başkasının bulduğu | Araçların bulduğu | Bizim bulduğumuz |
 |---|---|---|---|
-| Kasım 2026 | 1 (Yunus: H-001) | 9 (H-004…H-012) | 2 (H-002, H-003) |
+| Kasım 2026 | 1 (Yunus: H-001) | 11 (H-004…H-012, H-014, H-015) | 3 (H-002, H-003, H-013) |
 
 ## Kayıtlar
 
@@ -40,22 +40,39 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
 ### H-004 · Sitede adres çubuğundan zararlı kod çalıştırma riski (DOM XSS)
 - **Bulan:** SonarQube, 5 Kasım 2026 · **Önem:** engelleyici · **Tür:** OWASP A05, CWE-79 (G1)
 - **Yer:** `kitaplik/public/uygulama.js` yonlendir(): adresten gelen değer `innerHTML` ile sayfaya yazılıyor.
-- **Tür denetimi:** SonarQube ve CodeQL her gönderimde; planlı: zararlı adresle tarayıcı testi.
-- **Durum:** Açık.
+- **Gerçek mi?** Evet: eski kodda depoya konan değer tarayıcıda kod olarak çalıştı (doğrulandı). Yol: "verilerimi
+  içe aktar" ile kötü niyetli bir yedek dosyası. Kaynak `hedef` alanıydı; içe aktarma da hiçbir alanı denetlemiyordu.
+- **Düzeltme:** Tek veri temizleyici (`temizle`): depodan okurken ve dosyadan içe aktarırken her alan türüne göre süzülür.
+- **Tür denetimi:** SonarQube, CodeQL; `kitaplik/testler-tarayici/veri.test.mjs` (gerçek Chromium, 4 test; eski kodda 3'ü
+  başarısız oluyor). **Durum:** Düzeltildi (iyilestirme dalı).
 
 ### H-005 · Kayıt dosyasından okunan değer dosya yolunu belirliyor
 - **Bulan:** SonarQube · **Önem:** engelleyici (pratikte düşük risk) · **Tür:** CWE-22 yol aşımı (K5)
-- **Yer:** `araclar/sesli/okuma.py` _json_yaz(). **Durum:** Açık.
+- **Yer:** `araclar/sesli/okuma.py` _json_yaz(). **İnceleme:** SonarQube'un gösterdiği yerde yol içerikten gelmiyor (yanlış
+  alarm); ama aynı türün gerçek örneği yeni deneme deposundaydı: dosya adı JSON'dan okunup siliniyordu.
+- **Düzeltme:** Deneme dosya adı yalnız `<özet>.deneme-N.wav` biçiminde kabul edilir; plan dosyası yapı denetiminden geçer,
+  bozuksa program düşmez. **Tür denetimi:** iki test (eski kodda başarısız). **Durum:** Düzeltildi (iyilestirme dalı).
 
 ### H-006 · Önbellek adlarında MD5/SHA1 güvenlik amaçlı mı belirtilmemiş
-- **Bulan:** bandit (yüksek), SonarQube (kritik) · **Tür:** A04 · **Durum:** Açık (tek satır: `usedforsecurity=False`).
+- **Bulan:** bandit (yüksek), SonarQube (kritik) · **Tür:** A04 · **Durum:** Düzeltildi (`usedforsecurity=False`; önbellek
+  adları değişmedi, doğrulandı).
 
 ### H-007 · torch 2.6.0'da 25 bilinen güvenlik açığı
-- **Bulan:** pip-audit · **Tür:** A03 Tedarik zinciri (G4) · **Durum:** Açık. Güncellemeden sonra Beyaz Diş bayt bayt
-  yeniden doğrulanacak.
+- **Bulan:** pip-audit · **Tür:** A03 Tedarik zinciri (G4)
+- **Düzeltme:** torch 2.13.0 (bilinen açığı olmayan ilk sürüm, OSV ile doğrulandı). torchaudio 2.9+ WAV okuma/yazma için
+  TorchCodec + sistem FFmpeg istiyordu: WAV işleri soundfile'a taşındı (torchaudio 2.6 da arka planda soundfile
+  kullanıyordu; gerçek bloklarla bayt bayt aynı). Ses verisi, örnekleme dönüşümü ve MP3 iki sürümde bayt bayt aynı;
+  SQUIM kalite puanı 6. ondalıkta farklı (kayıt 2 ondalık). Uçtan uca: Beyaz Diş (374,8 dk) torch 2.13 ile istek
+  atmadan baştan üretildi; MP3, kalite kaydı ve plan torch 2.6 çıktısıyla (o da teslim edilenle) bayt bayt aynı,
+  metin kontrolü %99,5. **Durum:** Düzeltildi; `.venv-ses`
+  6. adımda kodla birlikte güncellenecek.
 
 ### H-008 · Yayın aracında rollup açığı
-- **Bulan:** npm audit · **Tür:** A03 · **Durum:** Açık.
+- **Bulan:** npm audit · **Tür:** A03
+- **Kök neden:** netlify-cli 23 (4 ana sürüm geride) kendi içinde eski rollup taşıyordu; dışarıdan sabitlenemedi.
+- **Düzeltme:** netlify-cli 27.16.1. Sitenin çalışma zamanı paketlerinde açık: 0. Geliştirme araçlarında (Lighthouse CI,
+  Stryker, netlify-cli alt paketleri) 35 açık kaldı, 0 kritik; siteye ve okumaya girmez, npm'in önerdiği "düzeltme"
+  araçların eski sürümlerine dönmek. **Durum:** Düzeltildi (çalışma zamanı); geliştirme araçları izleniyor.
 
 ### H-009 · Ana sayfada 20 yerde yetersiz renk kontrastı
 - **Bulan:** axe, Lighthouse · **Tür:** Erişilebilirlik (O1) · **Durum:** Açık.
@@ -75,3 +92,23 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
 - **Kök neden:** Eklentinin yalnız Linux'ta çalıştığı kontrol edilmedi.
 - **Tür denetimi:** Kontrol listesi S2; bir ölçümün düşmesi artık öbürlerini durdurmuyor.
 - **Durum:** Düzeltildi (Scorecard ayrı Linux işinde).
+
+### H-013 · Bölünemeyen blok "bölünecek" diye kalıcı işaretleniyordu
+- **Bulan:** Mevcut test (test_isci_cli), birleştirmeden önce · **Önem:** orta · **Tür:** Kalıcı durum (K3)
+- **Kök neden:** Boş yanıtta blok, bölünüp bölünemeyeceğine bakılmadan diske "bölünecek" diye işaretleniyordu. Tek
+  paragraflık blokta bu, geçici bir boş yanıttan sonra bloğun bir daha hiç denenmemesi demekti.
+- **Tür denetimi:** test_tek_paragraflik_blok_bos_yanitta_kalici_isaretlenmez.
+- **Durum:** Düzeltildi (iyilestirme dalı).
+
+### H-014 · Testler çalıştıkları makinenin saat dilimine bağlıydı
+- **Bulan:** GitHub Actions (ilk tam ölçüm) · **Önem:** orta · **Tür:** Hedef ortam uyumu (S2)
+- **Kök neden:** "Kota TR 11:05'te yenilenir" beklentisi Türkiye saatine göre yazılmıştı; GitHub makinesi UTC.
+  Kod doğruydu, testler makineye göre geçip kalıyordu. Testler kalınca mutasyon testi de hiç başlamadı.
+- **Düzeltme:** Test paketi her makinede Türkiye saatiyle çalışır (`testler/__init__.py`). UTC'de yeniden üretildi,
+  düzeltmeden sonra UTC'de 127 test geçti. **Tür denetimi:** GitHub ölçümü her gönderimde UTC'de çalışır.
+- **Durum:** Düzeltildi (iyilestirme dalı).
+
+### H-015 · Veri katmanı Gemini modülünü çağırıyordu (katman ihlali)
+- **Bulan:** import-linter (otomatik ölçüm), kendi yarım kodumda · **Tür:** Mimari
+- **Kök neden:** İstek defteri özeti kota gününü `gemini` modülünden alıyordu; veri katmanı üst katmanı çağıramaz.
+- **Düzeltme:** Kota takvimi en alt katmanda kendi modülünde (`sesli/kota.py`). **Durum:** Düzeltildi (iyilestirme dalı).

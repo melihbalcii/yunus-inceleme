@@ -44,3 +44,26 @@ def model_hizi(dosya: Path, model: str) -> float:
 def basari_orani(dosya: Path, model: str) -> float:
     son = [x for x in oku(dosya) if x.get("model") == model and not x.get("yama")][-40:]
     return sum(1 for x in son if x.get("iyi")) / len(son) if len(son) >= 5 else 0.8
+
+
+# --- istek defteri (.tmp/istek-defteri.jsonl, gemini.GeminiTTS yazar) ---
+
+BOSA_GIDEN = ("kayip", "zaman_asimi", "bos", "guvenlik", "hata")
+"""Kotayı harcamış olabilip ses getirmeyen sonuçlar. "gitmedi" (bağlanılamadı) ve "sinir" (dakikalık 429) kota
+harcamaz."""
+
+
+def istek_ozeti(defter: Path, gun: str) -> dict[str, int]:
+    """Kota günü `gun` içinde atılan isteklerin sonuçlarına göre sayısı ({"ses": 9, "kayip": 1, …})."""
+    import datetime as dt
+
+    from .kota import kota_gunu
+    sayac: dict[str, int] = {}
+    for k in oku(defter):
+        try:
+            zaman = dt.datetime.strptime(k["zaman"], "%Y-%m-%dT%H:%M:%S%z")
+        except (KeyError, ValueError):
+            continue
+        if kota_gunu(zaman) == gun:
+            sayac[k.get("sonuc", "?")] = sayac.get(k.get("sonuc", "?"), 0) + 1
+    return sayac

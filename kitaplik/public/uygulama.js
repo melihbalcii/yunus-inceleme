@@ -12,6 +12,8 @@ const $$ = (s, k = document) => [...k.querySelectorAll(s)];
 const ses = $("#ses");
 const KAYIT = "kitaplik-v1";
 const HIZLAR = [0.8, 1, 1.15, 1.25, 1.5, 1.75, 2];
+const HEDEFLER = [10, 20, 30, 45, 60];   // günlük dinleme hedefi seçenekleri (dk)
+const SIRALAR = [["ad", "Ada göre"], ["yazar", "Yazara göre"], ["kisa", "Kısadan uzuna"], ["uzun", "Uzundan kısaya"], ["yeni", "Yeni eklenen"]];
 const UYKU = [0, 15, 30, 45, 60];
 const KOKENLER = [["Rus", "Rus klasikleri"], ["Dünya", "Dünya klasikleri"]];
 const DEPO = "indirilenler-v1";
@@ -74,17 +76,51 @@ let aramaMetni = "", aramaTur = null, kitaplikSekme = "devam";
 let vakit = 0;     // "Ne kadar vaktin var?" seçimi (dk)
 let sonTik = 0;    // dinleme süresi sayacı: son timeupdate anı
 
+// Tarayıcı deposundan ya da içe aktarılan dosyadan gelen veri türüne göre temizlenir (kalite/HATA-DEFTERI.md H-004):
+// beklenmeyen alan ve tür atılır. Sayfaya yazılabilecek her değer ya sayı, ya bilinen bir seçenek, ya da (kaçışla
+// yazılan) kısa bir metin olur. Eskiden örneğin "hedef" alanı denetlenmeden HTML'e giriyordu.
+const KIMLIK = /^[a-z0-9-]{1,80}$/, GUN_BICIMI = /^\d{4}-\d{2}-\d{2}$/;
+const sayi = (x, enAz = 0, enCok = Number.MAX_SAFE_INTEGER) => (Number.isFinite(x) && x >= enAz && x <= enCok ? x : null);
+const dizi = (x) => (Array.isArray(x) ? x : []);
+function sozluk(x, anahtar, deger) {
+  const s = {};
+  if (x && typeof x === "object" && !Array.isArray(x)) {
+    for (const [k, v] of Object.entries(x)) {
+      const d = deger(v);
+      if (anahtar.test(k) && d !== null) s[k] = d;
+    }
+  }
+  return s;
+}
+const im = (m) => (m && sayi(m.t) !== null ? { t: m.t, not: typeof m.not === "string" ? m.not.slice(0, 140) : "", zaman: sayi(m.zaman) ?? 0 } : null);
+function temizle(d) {
+  d = d && typeof d === "object" && !Array.isArray(d) ? d : {};
+  return {
+    konum: sozluk(d.konum, KIMLIK, (v) => sayi(v)),
+    bitti: sozluk(d.bitti, KIMLIK, (v) => (v === true ? true : null)),
+    son: typeof d.son === "string" && KIMLIK.test(d.son) ? d.son : null,
+    hiz: HIZLAR.includes(d.hiz) ? d.hiz : 1,
+    zaman: sozluk(d.zaman, KIMLIK, (v) => sayi(v)),
+    imler: sozluk(d.imler, KIMLIK, (l) => { const m = dizi(l).map(im).filter(Boolean); return m.length ? m : null; }),
+    indirilen: sozluk(d.indirilen, KIMLIK, (v) => (typeof v === "string" && v.startsWith("/ses/") && v.length < 200 ? v : null)),
+    sonra: dizi(d.sonra).filter((x) => typeof x === "string" && KIMLIK.test(x)),
+    gunluk: sozluk(d.gunluk, GUN_BICIMI, (v) => sayi(v, 0, 86400)),
+    hedef: HEDEFLER.includes(d.hedef) ? d.hedef : 20,
+    begen: sozluk(d.begen, KIMLIK, (v) => sayi(v)),
+    aramalar: dizi(d.aramalar).filter((x) => typeof x === "string").map((x) => x.slice(0, 100)).slice(0, 6),
+    sirala: SIRALAR.some(([k]) => k === d.sirala) ? d.sirala : "ad",
+    saatler: Array.from({ length: 24 }, (_, i) => sayi(dizi(d.saatler)[i], 0, 86400 * 3650) ?? 0),
+    rozet: sozluk(d.rozet, KIMLIK, (v) => sayi(v)),
+    kurGizle: d.kurGizle === true,
+    sozGoruldu: typeof d.sozGoruldu === "string" && GUN_BICIMI.test(d.sozGoruldu) ? d.sozGoruldu : "",
+  };
+}
 const durum = oku();
 function oku() {
   try {
-    const d = JSON.parse(localStorage.getItem(KAYIT)) || {};
-    return { konum: d.konum || {}, bitti: d.bitti || {}, son: d.son || null, hiz: d.hiz || 1, zaman: d.zaman || {},
-      imler: d.imler || {}, indirilen: d.indirilen || {}, sonra: d.sonra || [], gunluk: d.gunluk || {}, hedef: d.hedef || 20,
-      begen: d.begen || {}, aramalar: d.aramalar || [], sirala: d.sirala || "ad",
-      saatler: d.saatler || Array(24).fill(0), rozet: d.rozet || {}, kurGizle: !!d.kurGizle, sozGoruldu: d.sozGoruldu || "" };
+    return temizle(JSON.parse(localStorage.getItem(KAYIT)));
   } catch {
-    return { konum: {}, bitti: {}, son: null, hiz: 1, zaman: {}, imler: {}, indirilen: {}, sonra: [], gunluk: {}, hedef: 20,
-      begen: {}, aramalar: [], sirala: "ad", saatler: Array(24).fill(0), rozet: {}, kurGizle: false, sozGoruldu: "" };
+    return temizle({});
   }
 }
 function yaz() {
@@ -132,7 +168,6 @@ const indirildi = (k) => durum.indirilen[k.id] === k.yol;  // eser yeniden kodla
 const begenildi = (id) => !!durum.begen[id];
 // 1 Kasım 2026 yenilikleri: sıralama, akıllı geri sarma, beğeniler, şans eseri, veri taşıma, internetsiz şerit,
 // bitiş kutlaması, çift dokunuşla atlama, genişletilmiş arama, uykuda sesin yavaşça kısılması
-const SIRALAR = [["ad", "Ada göre"], ["yazar", "Yazara göre"], ["kisa", "Kısadan uzuna"], ["uzun", "Uzundan kısaya"], ["yeni", "Yeni eklenen"]];
 function sirala(liste) {
   const l = [...liste], tr = (a, b) => a.localeCompare(b, "tr");
   const f = { ad: (a, b) => tr(a.eser, b.eser), yazar: (a, b) => tr(a.yazar, b.yazar) || tr(a.eser, b.eser),
@@ -442,7 +477,7 @@ function karneSayfa() {
     ${isiHaritasi()}
     ${rozetBolumu()}
     <section class="raf"><div class="raf-bas"><h2>Günlük hedefin</h2></div>
-      <div class="cipler">${[10, 20, 30, 45, 60].map((d) => `<button class="cip" data-hedef="${d}" aria-pressed="${durum.hedef === d}">${d} dk</button>`).join("")}</div></section>
+      <div class="cipler">${HEDEFLER.map((d) => `<button class="cip" data-hedef="${d}" aria-pressed="${durum.hedef === d}">${d} dk</button>`).join("")}</div></section>
     <section class="raf tasima"><div class="raf-bas"><h2>Verilerini taşı</h2></div>
       <p class="vakit-not">Kaldığın yerler, bitirdiklerin, yer imlerin, beğenilerin ve karnen yalnız bu cihazda durur.
         Telefondan bilgisayara (ya da yeni telefona) geçerken dosyaya kaydet, öbür cihazda “Dosyadan yükle” ile al. İkisindeki bilgiler birleşir, hiçbiri silinmez.</p>
@@ -923,8 +958,9 @@ function disaAktar() {
 }
 function iceAktar(dosya) {
   dosya.text().then((metin) => {
-    const j = JSON.parse(metin), v = j && j.uygulama === "melihten-dinle" && j.veri;
-    if (!v) throw new Error("dosya");
+    const j = JSON.parse(metin);
+    if (!j || j.uygulama !== "melihten-dinle" || !j.veri) throw new Error("dosya");
+    const v = temizle(j.veri);   // dosya dışarıdan gelir: hiçbir alanı denetlenmeden alınmaz
     // birleştir: hiçbir bilgi kaybolmaz; aynı eserde en ileri konum, aynı günde en uzun dinleme alınır
     for (const [id, t] of Object.entries(v.konum || {})) durum.konum[id] = Math.max(durum.konum[id] || 0, t);
     for (const [id, t] of Object.entries(v.zaman || {})) durum.zaman[id] = Math.max(durum.zaman[id] || 0, t);

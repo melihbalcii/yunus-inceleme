@@ -112,6 +112,13 @@ m = re.search(r"all files\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)", sys.stdin.read())
 json.dump({"satir": float(m[1]), "dal": float(m[2])} if m else None, open(sys.argv[1], "w"))' "$S/kapsam-ts.json"
 fi
 
+if adim tarayici; then
+  baslik "ön yüz tarayıcı testleri (Chromium)"
+  [ -z "$testler" ] && testler=true
+  npm run --silent test:tarayici 2>&1 | grep -E "^ℹ (tests|pass|fail)" || true
+  npm run --silent test:tarayici >/dev/null 2>&1 || testler=false
+fi
+
 if adim npm-audit; then
   baslik "npm audit (çalışma zamanı paketleri)"
   npm audit --omit=dev --json > "$S/npm-audit.json" 2>/dev/null || true

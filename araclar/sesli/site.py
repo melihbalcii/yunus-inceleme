@@ -164,7 +164,7 @@ class OzetOnbellegi:
         st = mp3.stat()
         anahtar = f"{mp3}|{st.st_size}|{st.st_mtime_ns}|{KBPS}|{PARCA_SINIRI}"
         if anahtar not in self._veri:
-            h = hashlib.sha1()
+            h = hashlib.sha1(usedforsecurity=False)  # dosya parmak izi: güvenlik amaçlı değil
             with open(mp3, "rb") as f:
                 for parca in iter(lambda: f.read(2**22), b""):
                     h.update(parca)

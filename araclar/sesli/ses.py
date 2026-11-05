@@ -26,17 +26,21 @@ def sessizlik(sn: float) -> Dalga:
     return np.zeros(int(SR * sn), dtype=np.float32)
 
 
+# WAV okuma/yazma soundfile ile: torchaudio 2.6 da arka planda soundfile kullanıyordu; sonuç bayt bayt aynıdır
+# (5 Kasım 2026'da gerçek önbellek bloklarıyla doğrulandı). torchaudio 2.9+ okuma/yazma için TorchCodec ve sistem
+# FFmpeg'i istiyor; o bağımlılık böylece gerekmez (torch güvenlik güncellemesi, kalite/HATA-DEFTERI.md H-007).
+
 def wav_oku(yol: Path) -> Dalga:
-    import torchaudio as ta
-    return np.asarray(ta.load(str(yol))[0][0].numpy(), dtype=np.float32)
+    import soundfile as sf
+    ses, _ = sf.read(str(yol), dtype="float32", always_2d=True)
+    return np.ascontiguousarray(ses[:, 0])
 
 
 def wav_yaz(yol: Path, ses: Dalga) -> None:
     """16 bit PCM; önce geçici dosyaya yazılıp yerine taşınır, yarım dosya önbelleğe girmez."""
-    import torch
-    import torchaudio as ta
+    import soundfile as sf
     gecici = yol.with_name(yol.stem + ".yaziliyor.wav")
-    ta.save(str(gecici), torch.from_numpy(ses).unsqueeze(0), SR, encoding="PCM_S", bits_per_sample=16)
+    sf.write(str(gecici), ses, SR, subtype="PCM_16", format="WAV")
     gecici.replace(yol)
 
 

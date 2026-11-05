@@ -38,7 +38,7 @@ layers = [
     "sesli.site : sesli.teslim : sesli.kontrol : sesli.hazirlik : sesli.okuma : sesli.yama",
     "sesli.gemini : sesli.ses",
     "sesli.metin | sesli.karsilastir | sesli.ceviri",
-    "sesli.yollar : sesli.ayar : sesli.katalog : sesli.durum : sesli.olcum",
+    "sesli.yollar : sesli.ayar : sesli.katalog : sesli.durum : sesli.olcum : sesli.kilit : sesli.kota",
 ]
 
 [[tool.importlinter.contracts]]

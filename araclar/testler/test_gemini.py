@@ -100,33 +100,20 @@ class UretTesti(unittest.TestCase):
         with self.assertRaises(G.BosYanit):
             t.uret("x")
 
-    def test_baglanti_hatasi_yinelenir_sonra_gecici(self):
+    def test_baglanilamazsa_yinelenir_sonra_gecici(self):
         import httpx
-        t, kurulum = _tts([httpx.ConnectError("koptu")] * G.BAGLANTI_DENEME)
+        t, kurulum = _tts([httpx.ConnectError("koptu")] * G.GITMEDI_DENEME)
         with self.assertRaises(G.GeciciHata):
             t.uret("x")
-        self.assertEqual(len(kurulum), G.BAGLANTI_DENEME)  # her kopuşta istemci yenilenir
+        self.assertEqual(len(kurulum), G.GITMEDI_DENEME)  # her denemede istemci yenilenir
+        self.assertEqual(t.atilan, 0)  # istek gitmedi: kota harcanmadı
 
-    def test_asili_istek_duvar_saatiyle_kesilir(self):
-        """4 Kasım: Mac uyuyunca istek 6 saat askıda kaldı. Süre dolunca istek bırakılıp yeniden denenir."""
-        olay = threading.Event()
-
-        def asili():
-            olay.wait(10)
-            return _yanit(_wav(0.1))
-
-        t, kurulum = _tts([asili, _yanit(_wav(0.1))], sure=0.3)
-        bas = time.time()
-        self.assertEqual(len(t.uret("x")), 2400)
-        self.assertLess(time.time() - bas, 3)
-        self.assertEqual(len(kurulum), 2)
-        olay.set()
-
-    def test_sunucu_hatasi_yinelenir(self):
+    def test_sunucu_hatasi_bir_kez_yinelenir(self):
         from google.genai import errors
         h = errors.ServerError(503, {"error": {"code": 503, "message": "meşgul", "status": "UNAVAILABLE"}})
         t, _ = _tts([h, _yanit(_wav(0.1))])
         self.assertEqual(len(t.uret("x")), 2400)
+        self.assertEqual(t.atilan, 2)  # 503 kotayı harcamış olabilir: sayılır
 
     def test_istemin_bicimi(self):
         self.assertTrue(G.istem("metin").startswith("## Director's notes:\n"))

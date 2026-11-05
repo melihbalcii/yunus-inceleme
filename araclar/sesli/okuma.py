@@ -4,6 +4,11 @@ Her blok okunur okunmaz Whisper ve ses kalitesiyle ölçülür; eşik tutmazsa �
 en iyisi tutulur. Bloklar .tmp/gemini-parcalar/<özet>.wav önbelleğindedir: yarıda kalan eser ertesi gün kaldığı
 yerden sürer. Özet = md5(metin|model|ses|üslup); aynı eseri ortak okuyan araçların blokları da geçerlidir.
 
+Kota güvenliği: bir bloğun her denemesi okunur okunmaz diske yazılır (<özet>.deneme-N.wav, ölçümü
+<özet>.denemeler.json'da). Kota ya da hata yarıda keserse ertesi gün kayıtlı denemeler kullanılır, aynı ses ikinci
+kez istenmez. Bir blok için kotayı harcayabilecek istek, kota günü başına en çok BLOK_TAVANI'dır (bağlantı
+tekrarları ve yama dahil). İkiye bölünen bloğun yarıları da kendi önbellek dosyalarına yazılır.
+
 Planlar:
   uyarlamalı  her istek ≈ hedef_sn saniyelik ses; blok sınırları okunan hızdan hesaplanır, blok-plan.json'da kalır
   sabit       ardışık paragraflar eşit boylu bloklarda (3.1 için 2000 kr: güvenlik filtresi uzunluğa takılıyor)
@@ -14,28 +19,34 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Protocol
+from typing import Any, Callable, Protocol
 
 import numpy as np
 
 from . import metin as M
 from . import olcum
 from . import ses as S
-from .gemini import USLUP, BosYanit, GuvenlikReddi, TTSHatasi
+from .gemini import USLUP, BosYanit, GeciciHata, GuvenlikReddi, TTSHatasi
+from .kota import kota_gunu
 from .karsilastir import olcum as blok_olcumu
 from .yollar import Yollar
 
 ESIK = 0.95         # Whisper eşleşmesi (harf düzeyinde); altındaki blok yeniden okutulur
 DENEME = 3
+BLOK_TAVANI = 4     # kota günü başına bir blok için kotayı harcayabilecek en çok istek
+TEK_ISTEK_BUTCESI = 2  # bir uret çağrısı: ilk istek + yanıtı kaybolursa bir tekrar
 YAMA_ESIGI = 0.85   # bundan iyi okunmuş ama eşiği tutmayan blok önce yamayla onarılır
 BLOK_ARASI = 0.8    # sn
 ILK_BLOK_PAYI = 0.88  # eserin hızı bilinmezken modelin hızının bu kadarı (diyalog ağırlıklı eser yavaş okunur)
 
 
 class Seslendirici(Protocol):
-    def uret(self, metin: str) -> S.Dalga: ...
+    atilan: int  # şimdiye dek atılan, kotayı harcamış olabilecek istek sayısı
+
+    def uret(self, metin: str, en_cok: int = ...) -> S.Dalga: ...
 
 
 class BolunemezHata(TTSHatasi):
@@ -54,7 +65,7 @@ class OkumaAyari:
 
 
 def blok_ozeti(metin: str, model: str, ses: str) -> str:
-    return hashlib.md5(f"{metin}|{model}|{ses}|{USLUP}".encode()).hexdigest()[:12]
+    return hashlib.md5(f"{metin}|{model}|{ses}|{USLUP}".encode(), usedforsecurity=False).hexdigest()[:12]
 
 
 def blok_dosyasi(klasor: Path, metin: str, ayar: OkumaAyari) -> Path:
@@ -66,11 +77,85 @@ def blok_dosyasi(klasor: Path, metin: str, ayar: OkumaAyari) -> Path:
     return klasor / f"{blok_ozeti(metin, ayar.model, ayar.ses)}.wav"
 
 
+@dataclass
+class Deneme:
+    """Bir bloğun bir okuması ve ölçümü."""
+    dosya: str
+    oran: float
+    eksik: list[str]
+    bas: float
+    son: float
+
+    @property
+    def bozuk(self) -> bool:
+        return S.kalite_bozuk(self.bas, self.son)
+
+    @property
+    def iyi(self) -> bool:
+        return self.oran >= ESIK and not self.eksik and not self.bozuk
+
+    @property
+    def puan(self) -> float:
+        return self.oran - 0.1 * len(self.eksik) - (1 if self.bozuk else 0)
+
+
+class DenemeDeposu:
+    """Bir bloğun bitmemiş denemeleri: <özet>.deneme-N.wav ve <özet>.denemeler.json (ölçümler, bugünkü istek
+    sayısı). Blok tamamlanınca silinir. İstek sayısı kota günü değişince sıfırlanır (bağlantı kesintisi bloğu kalıcı
+    kilitlemesin)."""
+
+    def __init__(self, klasor: Path, ozet: str, gun: Callable[[], str] = kota_gunu):
+        self.klasor, self.ozet, self._gun = klasor, ozet, gun
+        self._kayit = klasor / f"{ozet}.denemeler.json"
+        veri: dict[str, Any] = {}
+        if self._kayit.exists():
+            try:
+                veri = json.loads(self._kayit.read_text(encoding="utf-8"))
+            except ValueError:
+                veri = {}
+        self.denemeler = [x for d in veri.get("denemeler", []) if (x := self._deneme(d)) is not None]
+        self.istek = int(veri.get("istek", 0)) if veri.get("gun") == gun() else 0
+        self.bolunecek = bool(veri.get("bolunecek"))  # model bu bloğa bütün olarak ses vermiyor: yarılarıyla okunur
+
+    def _deneme(self, d: object) -> Deneme | None:
+        """Kayıttaki bir denemeyi doğrular. Dosya adı kayıttan okunup açılıyor ve siliniyor: yalnız bu bloğun
+        "<özet>.deneme-N.wav" biçimindeki adı kabul edilir (CWE-22: "../" ile başka dosyaya ulaşılmasın)."""
+        if not isinstance(d, dict) or not isinstance(d.get("dosya"), str):
+            return None
+        if not re.fullmatch(rf"{re.escape(self.ozet)}\.deneme-\d{{1,2}}\.wav", d["dosya"]):
+            return None
+        try:
+            deneme = Deneme(d["dosya"], float(d["oran"]), [str(x) for x in d["eksik"]], float(d["bas"]), float(d["son"]))
+        except (KeyError, TypeError, ValueError):
+            return None
+        return deneme if (self.klasor / deneme.dosya).exists() else None
+
+    def ses(self, d: Deneme) -> S.Dalga:
+        return S.wav_oku(self.klasor / d.dosya)
+
+    def ekle(self, ses: S.Dalga, oran: float, eksik: list[str], bas: float, son: float) -> Deneme:
+        d = Deneme(f"{self.ozet}.deneme-{len(self.denemeler) + 1}.wav", oran, eksik, bas, son)
+        S.wav_yaz(self.klasor / d.dosya, ses)
+        self.denemeler.append(d)
+        self.kaydet()
+        return d
+
+    def kaydet(self) -> None:
+        _json_yaz(self._kayit, {"gun": self._gun(), "istek": self.istek, "bolunecek": self.bolunecek,
+                                "denemeler": [vars(d) for d in self.denemeler]})
+
+    def temizle(self) -> None:
+        for d in self.denemeler:
+            (self.klasor / d.dosya).unlink(missing_ok=True)
+        self._kayit.unlink(missing_ok=True)
+
+
 class Okuyucu:
     def __init__(self, tts: Seslendirici, ayar: OkumaAyari, yollar: Yollar, bildir: Callable[[str], None] = print,
                  olc: Callable[[str, S.Dalga], tuple[float, list[str]]] | None = None,
                  kalite: Callable[[S.Dalga], tuple[float, float]] = S.kalite,
-                 yamala: Callable[..., S.Dalga | None] | None = None):
+                 yamala: Callable[..., S.Dalga | None] | None = None,
+                 gun: Callable[[], str] = kota_gunu):
         self.tts, self.ayar, self.yollar, self.bildir = tts, ayar, yollar, bildir
         self._olc = olc or (lambda metin, ses: blok_olcumu(metin, S.dok(ses)))
         self._kalite = kalite
@@ -78,46 +163,72 @@ class Okuyucu:
             from .yama import yamala as _y
             yamala = _y
         self._yamala = yamala
+        self._gun = gun
 
     # --- tek blok ---
 
+    def _depo(self, metin: str) -> DenemeDeposu:
+        return DenemeDeposu(self.yollar.parcalar, blok_ozeti(metin, self.ayar.model, self.ayar.ses), self._gun)
+
+    def _iste(self, depo: DenemeDeposu, metin: str, en_cok: int) -> S.Dalga:
+        """Bütçe içinde tek seslendirme çağrısı; harcanan istekler bloğun bugünkü sayacına (diske) yazılır."""
+        kalan = BLOK_TAVANI - depo.istek
+        if kalan < 1:
+            raise GeciciHata(f"blok için bugün {BLOK_TAVANI} istek harcandı; yeni istek atılmıyor")
+        once = self.tts.atilan
+        try:
+            return self.tts.uret(metin, en_cok=min(en_cok, kalan))
+        finally:
+            depo.istek += self.tts.atilan - once
+            depo.kaydet()
+
     def seslendir(self, metin: str, etiket: str) -> S.Dalga:
-        """Bloğu okutur, ölçer, eşik tutmazsa yama ya da yeniden okuma dener; boş yanıtta ikiye böler."""
-        en_iyi: tuple[float, S.Dalga] | None = None
-        for d in range(self.ayar.deneme):
+        """Bloğu okutur, ölçer, eşik tutmazsa yama ya da yeniden okuma dener; boş yanıtta ikiye böler. Her deneme
+        hemen diske yazılır; daha önce kayıtlı denemeler yeniden istenmez."""
+        depo = self._depo(metin)
+        if depo.bolunecek:
+            return self._bolerek(metin, etiket)
+        for d in depo.denemeler:
+            self.bildir(f"{etiket} kayıtlı deneme kullanılıyor: {d.dosya} (eşleşme {d.oran:.3f})")
+            if d.iyi:
+                return depo.ses(d)
+        while len(depo.denemeler) < self.ayar.deneme and depo.istek < BLOK_TAVANI:
             try:
-                ses = self.tts.uret(metin)
+                ses = self._iste(depo, metin, TEK_ISTEK_BUTCESI)
             except GuvenlikReddi as h:
                 if not h.bolunebilir:
                     raise
-                return self._bolerek(metin, etiket)
+                return self._bolunecek(depo, metin, etiket)
             except BosYanit:
-                return self._bolerek(metin, etiket)
+                return self._bolunecek(depo, metin, etiket)
+            except GeciciHata:
+                if depo.denemeler:
+                    break  # bugünkü bütçe bitti: eldeki en iyi deneme tutulur
+                raise
             oran, eksik = self._olc(metin, ses)
             k_bas, k_son = self._kalite(ses)
-            bozuk = S.kalite_bozuk(k_bas, k_son)
-            iyi = oran >= ESIK and not eksik and not bozuk
+            d = depo.ekle(ses, oran, eksik, k_bas, k_son)
+            no = len(depo.denemeler)
             olcum.yaz(self.yollar.olcum, self.ayar.model, kr=len(metin), sn=round(len(ses) / S.SR, 1),
-                      oran=round(oran, 4), iyi=iyi, atlama=len(eksik), kalite=[round(k_bas, 2), round(k_son, 2)])
+                      oran=round(oran, 4), iyi=d.iyi, atlama=len(eksik), kalite=[round(k_bas, 2), round(k_son, 2)])
             self.bildir(f"{etiket} {len(metin)} kr, {len(ses) / S.SR:.0f} sn, eşleşme {oran:.3f}, "
                         f"ses kalitesi {k_bas:.1f}→{k_son:.1f}" + (f", ATLAMA: {eksik}" if eksik else "")
-                        + (", SES BOZULUYOR" if bozuk else "") + ("" if iyi else f" (deneme {d + 1}/{self.ayar.deneme})"))
-            if not iyi and not bozuk and oran >= YAMA_ESIGI:
-                onarilmis = self._yamayi_dene(metin, ses, etiket)
+                        + (", SES BOZULUYOR" if d.bozuk else "") + ("" if d.iyi else f" (deneme {no}/{self.ayar.deneme})"))
+            if d.iyi:
+                return ses
+            if not d.bozuk and oran >= YAMA_ESIGI and depo.istek < BLOK_TAVANI:
+                onarilmis = self._yamayi_dene(depo, metin, ses, etiket)
                 if onarilmis is not None:
                     return onarilmis
-            puan = oran - 0.1 * len(eksik) - (1 if bozuk else 0)
-            if en_iyi is None or puan > en_iyi[0]:
-                en_iyi = (puan, ses)
-            if iyi:
-                break
-        assert en_iyi is not None
-        return en_iyi[1]  # eşik tutmasa da en iyisi tutulur; kontrol raporu gösterir
+        if not depo.denemeler:
+            raise GeciciHata(f"blok için bugün {BLOK_TAVANI} istek harcandı, ses alınamadı")
+        en_iyi = max(depo.denemeler, key=lambda d: d.puan)  # eşik tutmasa da en iyisi; kontrol raporu gösterir
+        return depo.ses(en_iyi)
 
-    def _yamayi_dene(self, metin: str, ses: S.Dalga, etiket: str) -> S.Dalga | None:
+    def _yamayi_dene(self, depo: DenemeDeposu, metin: str, ses: S.Dalga, etiket: str) -> S.Dalga | None:
         from .gemini import KotaDoldu
-        try:
-            onarilmis = self._yamala(metin, ses, self.tts.uret, ESIK, self.bildir)
+        try:  # yama tek istektir: yanıtı kaybolursa tekrar edilmez
+            onarilmis = self._yamala(metin, ses, lambda m: self._iste(depo, m, 1), ESIK, self.bildir)
         except KotaDoldu:
             raise
         except Exception as h:  # yama beklenmedik bir duruma düşerse blok eski yolla yeniden okunur
@@ -132,6 +243,14 @@ class Okuyucu:
                   oran=round(oran, 4), iyi=tamam, atlama=len(eksik), yama=True)
         return onarilmis if tamam else None
 
+    def _bolunecek(self, depo: DenemeDeposu, metin: str, etiket: str) -> S.Dalga:
+        # Yarıda kalırsa ertesi gün bütün blok yeniden istenmesin diye işaretlenir. Tek paragraflık blok bölünemez:
+        # işaretlenmez (boş yanıt geçici olabilir; işaret kalırsa blok bir daha hiç denenmezdi).
+        if len(metin.split("\n\n")) >= 2:
+            depo.bolunecek = True
+            depo.kaydet()
+        return self._bolerek(metin, etiket)
+
     def _bolerek(self, metin: str, etiket: str) -> S.Dalga:
         paragraf = metin.split("\n\n")
         if len(paragraf) < 2:
@@ -143,8 +262,9 @@ class Okuyucu:
                 break
         i = max(1, min(i, len(paragraf) - 1))
         self.bildir(f"{etiket} ikiye bölünüyor ({len(metin)} kr)")
-        sol = self.seslendir("\n\n".join(paragraf[:i]), etiket + "a")
-        sag = self.seslendir("\n\n".join(paragraf[i:]), etiket + "b")
+        # yarılar kendi önbellek dosyalarına yazılır: sağ yarı hata verirse okunmuş sol yarı yeniden istenmez
+        _, sol = self._blok("\n\n".join(paragraf[:i]), etiket + "a")
+        _, sag = self._blok("\n\n".join(paragraf[i:]), etiket + "b")
         return np.concatenate([sol, S.sessizlik(BLOK_ARASI), sag])
 
     def _blok(self, metin: str, etiket: str) -> tuple[Path, S.Dalga]:
@@ -153,6 +273,7 @@ class Okuyucu:
             return dosya, S.wav_oku(dosya)
         ses = self.seslendir(metin, etiket)
         S.wav_yaz(dosya, ses)
+        self._depo(metin).temizle()
         return dosya, ses
 
     # --- planlar ---
@@ -161,11 +282,10 @@ class Okuyucu:
         par = M.paragraflar(yazi, self.ayar.siir)
         kimlik = dict(model=self.ayar.model, ses=self.ayar.ses, uslup=USLUP, paragraf=len(par),
                       karakter=sum(len(p.metin) for p in par))
-        kayit = json.loads(plan_dosyasi.read_text()) if plan_dosyasi.exists() else {}
-        eski = kayit.get("kimlik") or {}
+        eski, eski_sinirlar = self._plan_oku(plan_dosyasi, len(par))
         if eski.get("model") in self.ayar.ortak and {**eski, "model": self.ayar.model} == kimlik:
             kimlik = eski  # ortak aracın planı aynen sürer (sınırlar değişirse önbellekteki bloklar tutmaz)
-        sinirlar: list[int] = list(kayit.get("sinirlar", [])) if kayit.get("kimlik") == kimlik else []
+        sinirlar: list[int] = eski_sinirlar if eski == kimlik else []
         hizlar: list[float] = []
         bloklar: list[tuple[Path, str]] = []
         i = n = 0
@@ -187,6 +307,23 @@ class Okuyucu:
             bloklar.append((dosya, metin))
             i = j
         return bloklar
+
+    def _plan_oku(self, plan_dosyasi: Path, paragraf_sayisi: int) -> tuple[dict[str, Any], list[int]]:
+        """blok-plan.json'u doğrulayarak okur: (kimlik, sınırlar). Bozuk dosya programı düşürmez; uyarıyla yok sayılır."""
+        if not plan_dosyasi.exists():
+            return {}, []
+        try:
+            kayit = json.loads(plan_dosyasi.read_text())
+            kimlik, sinirlar = kayit.get("kimlik") or {}, kayit.get("sinirlar", [])
+            gecerli = (isinstance(kimlik, dict) and all(isinstance(v, (str, int)) for v in kimlik.values())
+                       and isinstance(sinirlar, list) and all(type(x) is int for x in sinirlar)
+                       and sinirlar == sorted(set(sinirlar)) and all(0 < x <= paragraf_sayisi for x in sinirlar))
+        except (OSError, ValueError, AttributeError):
+            gecerli = False
+        if not gecerli:
+            self.bildir(f"UYARI: {plan_dosyasi} bozuk, yok sayılıyor (blok sınırları yeniden hesaplanacak)")
+            return {}, []
+        return kimlik, sinirlar
 
     def _sabit(self, yazi: str) -> list[tuple[Path, str]]:
         metinler = M.sabit_bloklar(yazi, self.ayar.siir, self.ayar.sabit_blok)
