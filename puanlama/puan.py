@@ -168,25 +168,47 @@ def on_yuz_kapsami() -> tuple[float | None, str]:
     return (0.0, "ön yüz testi yok") if d is None else (d["satir"], f"satır %{d['satir']:.1f}")
 
 
-ALANLAR: list[tuple[str, int, list[tuple[str, float, Any]]]] = [
-    ("Doğruluk ve hata dayanıklılığı", 35, [
-        ("Mutasyon (Python, mutmut)", .45, mutmut), ("Mutasyon (TypeScript, Stryker)", .15, stryker),
-        ("Dal kapsamı (Python)", .25, dal_kapsami), ("Satır kapsamı (TypeScript)", .15, ts_kapsami)]),
-    ("Mimari", 20, [
-        ("Katman kuralları", .40, katmanlar), ("İşlev karmaşıklığı", .40, karmasiklik),
-        ("Modül boyutu", .20, modul_boyutu)]),
-    ("Kod kalitesi", 15, [
-        ("SonarQube notları", .50, sonar_notlari), ("SonarQube kod tekrarı", .20, sonar_tekrar),
-        ("Kural ihlali yoğunluğu (ruff)", .30, ruff_yogunluk)]),
-    ("Güvenlik", 15, [
-        ("bandit", .40, bandit), ("Bağımlılık açıkları", .30, bagimlilik), ("OpenSSF Scorecard", .30, scorecard)]),
-    ("Ön yüz", 15, [
-        ("Lighthouse performans", .20, lambda: lighthouse("performance")),
-        ("Lighthouse erişilebilirlik", .20, lambda: lighthouse("accessibility")),
-        ("Lighthouse iyi uygulamalar", .20, lambda: lighthouse("best-practices")),
-        ("axe erişilebilirlik", .20, axe), ("Ön yüz test kapsamı", .20, on_yuz_kapsami)]),
-]
+def dayaniklilik(modul: str) -> tuple[float | None, str]:
+    """Dayanıklılık test takımı çalıştı mı ve geçti mi: atlanan (araç yok) ya da kalan test 0 puandır."""
+    d = (oku("dayaniklilik.json") or {}).get(modul)
+    if not d:
+        return None, "ÖLÇÜLMEDİ"
+    toplam = d["gecen"] + d["atlanan"] + d["kalan"]
+    if not toplam:
+        return 0.0, "test yok"
+    return 100 * d["gecen"] / toplam, f"{d['gecen']}/{toplam} geçti, {d['atlanan']} atlandı, {d['kalan']} kaldı"
 
+
+Olcumler = list[tuple[str, float, Any]]
+
+DOGRULUK: Olcumler = [
+    ("Mutasyon (Python, mutmut)", .45, mutmut), ("Mutasyon (TypeScript, Stryker)", .15, stryker),
+    ("Dal kapsamı (Python)", .25, dal_kapsami), ("Satır kapsamı (TypeScript)", .15, ts_kapsami)]
+MIMARI: Olcumler = [
+    ("Katman kuralları", .40, katmanlar), ("İşlev karmaşıklığı", .40, karmasiklik), ("Modül boyutu", .20, modul_boyutu)]
+KALITE: Olcumler = [
+    ("SonarQube notları", .50, sonar_notlari), ("SonarQube kod tekrarı", .20, sonar_tekrar),
+    ("Kural ihlali yoğunluğu (ruff)", .30, ruff_yogunluk)]
+GUVENLIK: Olcumler = [
+    ("bandit", .40, bandit), ("Bağımlılık açıkları", .30, bagimlilik), ("OpenSSF Scorecard", .30, scorecard)]
+ON_YUZ: Olcumler = [
+    ("Lighthouse performans", .20, lambda: lighthouse("performance")),
+    ("Lighthouse erişilebilirlik", .20, lambda: lighthouse("accessibility")),
+    ("Lighthouse iyi uygulamalar", .20, lambda: lighthouse("best-practices")),
+    ("axe erişilebilirlik", .20, axe), ("Ön yüz test kapsamı", .20, on_yuz_kapsami)]
+DAYANIKLILIK: Olcumler = [
+    ("Gerçek ağ arızası (Toxiproxy)", .35, lambda: dayaniklilik("test_ag_kopmasi")),
+    ("Çökme (süreç öldürme)", .35, lambda: dayaniklilik("test_cokme")),
+    ("Rastgele hata sırası (Hypothesis)", .30, lambda: dayaniklilik("test_dayaniklilik"))]
+
+# v1: ilk ölçümden önce kaydedilen formül (5 Kasım). Karşılaştırma için her raporda yanında hesaplanır.
+ALANLAR_V1: list[tuple[str, int, Olcumler]] = [
+    ("Doğruluk ve hata dayanıklılığı", 35, DOGRULUK), ("Mimari", 20, MIMARI), ("Kod kalitesi", 15, KALITE),
+    ("Güvenlik", 15, GUVENLIK), ("Ön yüz", 15, ON_YUZ)]
+# v2 (6 Kasım, PUANLAMA.md "Değişiklikler"): dayanıklılık ayrı alan; öbür ağırlıklar orantılı küçüldü.
+ALANLAR: list[tuple[str, int, Olcumler]] = [
+    ("Doğruluk", 30, DOGRULUK), ("Mimari", 17, MIMARI), ("Kod kalitesi", 14, KALITE),
+    ("Güvenlik", 14, GUVENLIK), ("Ön yüz", 15, ON_YUZ), ("Dayanıklılık", 10, DAYANIKLILIK)]
 
 def _guvenlik_sarti(bandit_yuksek: int | None, codeql_yuksek: int | None) -> bool | None:
     """Biri bile bulgu verdiyse tutmadı; ikisi de 0 ise tuttu; aksi hâlde ölçülmedi."""
@@ -236,7 +258,9 @@ def main() -> int:
         print(f"  {'TUTTU' if durum else ('ÖLÇÜLMEDİ' if durum is None else 'TUTMADI'):<10} {ad} {ek}".rstrip())
         rapor["kesin"].append({"ad": ad, "durum": durum, "ek": ek})
     rapor["toplam"], rapor["sonuc"] = round(toplam, 1), "GEÇTİ" if gecti else "GEÇMEDİ"
-    print(f"\nTOPLAM: {toplam:.1f} / 100 — {rapor['sonuc']}")
+    eski = sum(agirlik * sum(pay * (f()[0] or 0) for _, pay, f in o) / 100 for _, agirlik, o in ALANLAR_V1)
+    rapor["toplam_v1"] = round(eski, 1)
+    print(f"\nTOPLAM: {toplam:.1f} / 100 — {rapor['sonuc']}  (eski v1 formülüyle: {eski:.1f})")
     (S / "puan.json").write_text(json.dumps(rapor, ensure_ascii=False, indent=1), encoding="utf-8")
     return 0 if gecti else 1
 

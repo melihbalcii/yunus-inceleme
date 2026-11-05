@@ -77,3 +77,23 @@ ruff kural kümesi: `E, F, W, B, C90, UP, SIM, PL` (satır sınırı 120). Küme
 - **Lighthouse kategori puanı:** Her sayfa 3 kez ölçülür, ortanca alınır; iki sayfanın ortalaması kullanılır.
 - **Mutasyon puanında zaman aşımı:** Stryker'ın ve mutmut'un "timeout" sonucu öldürülmüş sayılır (iki aracın da
   varsayılanı).
+
+## Değişiklikler
+
+### v2 — 6 Kasım 2026: "Dayanıklılık" ayrı alan (10 puan)
+**Gerekçe:** Yunus'un bulduğu sorun (H-001: hata durumunda aynı işin 2–4 kez yaptırılması) v1'deki hiçbir ölçümle
+yakalanmıyordu. Hata durumlarını gerçek koşulda sınayan testler artık var; puanda ayrı görünmeleri gerekir.
+
+| Alan | v1 | v2 |
+|---|---|---|
+| Doğruluk (alt ölçümler aynı) | 35 | 30 |
+| Mimari | 20 | 17 |
+| Kod kalitesi | 15 | 14 |
+| Güvenlik | 15 | 14 |
+| Ön yüz | 15 | 15 |
+| Dayanıklılık | — | 10 |
+
+Dayanıklılık alt ölçümleri: gerçek ağ arızası (Toxiproxy, `testler/test_ag_kopmasi.py`) %35, çökme (süreç öldürme,
+`testler/test_cokme.py`) %35, rastgele hata sırası (Hypothesis + başvuru modeli, `testler/test_dayaniklilik.py`) %30.
+Her biri geçen test ÷ toplam; atlanan test (ör. Toxiproxy yok) geçmemiş sayılır. Bu alan "sınama yapılıyor ve
+geçiyor" der; testlerin gücünü mutasyon puanı (Doğruluk) ölçer. Her rapor v1 formülüyle hesaplanan puanı da yazar.
