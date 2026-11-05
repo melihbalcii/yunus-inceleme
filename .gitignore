@@ -11,3 +11,6 @@ kitaplik/.lighthouseci/
 kitaplik/reports/
 puanlama/sonuclar/
 .cache/
+# iCloud çakışma kopyaları
+* 2.*
+* 2
