@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import unittest
 from pathlib import Path
 
@@ -228,3 +229,55 @@ class BosaGidenTesti(GeciciKokTesti):
         self.y.istek_defteri.write_text("".join(_json.dumps({"zaman": zaman, "sonuc": x}) + "\n" for x in sonuclar))
         self.assertEqual(kota_gunu(simdi), kota_gunu())
         self.assertEqual(Z.bosa_giden(self.y), 5)
+
+
+class SorunluBlokSilmeTesti(GeciciKokTesti):
+    """Onarım için yalnız sorunlu blokların önbelleği silinir: sağlam blok silinirse yeniden okunur, kota boşa gider."""
+
+    def setUp(self):
+        super().setUp()
+        self.fola = self.y.fola_klasoru("kisa-oyku")
+        self.fola.mkdir(parents=True)
+        self.dosyalar = {no: self.y.parcalar / f"blok-{no}.wav" for no in range(1, 6)}
+        for d in self.dosyalar.values():
+            d.write_bytes(b"ses")
+        plan = [{"no": no, "dosya": d.name} for no, d in self.dosyalar.items()] + [{"no": 6, "tarz": "sessizlik"}]
+        (self.fola / "plan.json").write_text(json.dumps(plan))
+
+    def _kontrol(self, bloklar):
+        rapor = [{"no": no, "oran": oran, "kapsama": 1.0, "metin": "", "duyulan": "", "atlama": atlama}
+                 for no, oran, atlama in bloklar]
+        (self.fola / "kontrol.json").write_text(json.dumps({"eslesme": 98.0, "bloklar": rapor}))
+
+    def _kalanlar(self):
+        return sorted(no for no, d in self.dosyalar.items() if d.exists())
+
+    def test_yalniz_atlamali_dusuk_ve_bozuk_bloklar_silinir(self):
+        self._kontrol([(1, 0.99, []), (2, 0.98, ["atlanan cümle"]), (3, 0.89, []), (4, 0.90, []), (5, 0.99, [])])
+        (self.fola / "kalite.json").write_text(json.dumps([{"no": n, "bozuk": n == 5} for n in range(1, 6)]))
+        self.assertEqual(Z.sorunlu_bloklari_sil("kisa-oyku", self.y), 3)
+        self.assertEqual(self._kalanlar(), [1, 4], "0,90 tam eşikte ve sağlam bloklar kalmalı")
+
+    def test_kalite_kaydi_bozuksa_yalniz_kontroldekiler_silinir(self):
+        self._kontrol([(1, 0.99, []), (2, 0.5, [])])
+        (self.fola / "kalite.json").write_text("{bozuk")
+        self.assertEqual(Z.sorunlu_bloklari_sil("kisa-oyku", self.y), 1)
+        self.assertEqual(self._kalanlar(), [1, 3, 4, 5])
+
+    def test_plan_yoksa_ya_da_bozuksa_hicbir_sey_silinmez(self):
+        self._kontrol([(1, 0.1, ["x"])])
+        (self.fola / "plan.json").unlink()
+        self.assertEqual(Z.sorunlu_bloklari_sil("kisa-oyku", self.y), 0)
+        (self.fola / "plan.json").write_text("[bozuk")
+        self.assertEqual(Z.sorunlu_bloklari_sil("kisa-oyku", self.y), 0)
+        self.assertEqual(self._kalanlar(), [1, 2, 3, 4, 5])
+
+    def test_kontrol_kaydi_yoksa_yalniz_bozuk_sesli_bloklar_silinir(self):
+        (self.fola / "kalite.json").write_text(json.dumps([{"no": 4, "bozuk": True}, {"no": 2, "bozuk": False}]))
+        self.assertEqual(Z.sorunlu_bloklari_sil("kisa-oyku", self.y), 1)
+        self.assertEqual(self._kalanlar(), [1, 2, 3, 5])
+
+    def test_dosyasi_zaten_olmayan_blok_sayilmaz(self):
+        self._kontrol([(2, 0.5, []), (3, 0.5, [])])
+        self.dosyalar[2].unlink()
+        self.assertEqual(Z.sorunlu_bloklari_sil("kisa-oyku", self.y), 1)
