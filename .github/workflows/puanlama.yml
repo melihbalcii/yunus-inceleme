@@ -16,7 +16,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Scorecard bir "container" eklentisi: yalnız Linux makinede çalışır (5 Kasım'daki ilk çalıştırmada macOS'ta düştü).
+  scorecard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7.0.0
+        with:
+          persist-credentials: false
+      - name: OpenSSF Scorecard
+        uses: ossf/scorecard-action@v2.4.4
+        with:
+          results_file: scorecard.json
+          results_format: json
+          publish_results: false
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: scorecard
+          path: scorecard.json
+
   puanlama:
+    needs: scorecard
+    if: always()   # Scorecard düşse de öbür ölçümler çalışır
     runs-on: macos-latest   # üretim ortamı Apple Silicon Mac
     timeout-minutes: 300
     permissions:
@@ -79,12 +103,12 @@ jobs:
           print("CodeQL yüksek/kritik:", yuksek)
           EOF
 
-      - name: OpenSSF Scorecard
-        uses: ossf/scorecard-action@v2.4.4
+      - name: Scorecard sonucunu al
+        uses: actions/download-artifact@v8.0.1
+        continue-on-error: true   # Scorecard işi başarısızsa bu ölçüm "ÖLÇÜLMEDİ" kalır
         with:
-          results_file: puanlama/sonuclar/scorecard.json
-          results_format: json
-          publish_results: false
+          name: scorecard
+          path: puanlama/sonuclar/
 
       - name: Ölçümler ve puan
         env:
