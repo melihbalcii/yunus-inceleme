@@ -43,13 +43,28 @@ def _durum(y: Yollar, _a: argparse.Namespace) -> int:
             durum += f"; kontrol %{kontrol.eslesme:.2f} {'geçti' if kontrol.gecti else 'GEÇMEDİ'}"
         print(f"{e.no:>3}  {e.eser[:42]:<42} {durum}")
     print("\nKuyruk (kısadan uzuna):", ", ".join(f"{i.ad} ({i.uzunluk:,} kr)" for i in kuyruk(k, y)) or "boş")
+    from .gemini import kota_gunu
+    from .olcum import BOSA_GIDEN, istek_ozeti
+    gun = kota_gunu()
+    o = istek_ozeti(y.istek_defteri, gun)
+    harcanan = o.get("ses", 0) + sum(o.get(x, 0) for x in BOSA_GIDEN)
+    bosa = harcanan - o.get("ses", 0)
+    print(f"\nBugünkü istekler (kota günü {gun}): {harcanan} kota harcayan istek, {o.get('ses', 0)} ses geldi, "
+          f"{bosa} boşa gitti" + (f" (%{100 * bosa / harcanan:.0f})" if harcanan else "")
+          + (f"; ayrıntı: {', '.join(f'{k} {v}' for k, v in sorted(o.items()))}" if o else ""))
     return 0
 
 
 def _oku(y: Yollar, a: argparse.Namespace) -> int:
+    from .kilit import ZatenCalisiyor, tek_kopya
     from .zamanlayici import ARACLAR, kur
     kotalar = {ARACLAR[0].model: a.lite, ARACLAR[1].model: a.flash, ARACLAR[2].model: a.k31}
-    kur(y, kotalar).calis()
+    try:
+        with tek_kopya(y.zamanlayici_kilidi):  # iki kopya aynı eseri aynı anda okuyup kotayı iki kez yakmasın
+            kur(y, kotalar).calis()
+    except ZatenCalisiyor as h:
+        print(f"okuma programı zaten çalışıyor; ikinci kopya başlatılmadı ({h})")
+        return 1
     return 0
 
 

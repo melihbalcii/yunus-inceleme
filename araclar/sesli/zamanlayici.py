@@ -12,6 +12,9 @@ Kurallar (kullanıcının 26 Ekim – 4 Kasım 2026 kararları):
   araçtan alınır.
 - Hiçbir aracın kotası kalmayınca kotanın yenilendiği ABD Pasifik gece yarısı +5 dk'ya kadar beklenir. Bekleme duvar
   saatine bakar (Mac uyurken time.sleep süresi işlemez).
+- Bir araçta üst üste GECICI_SINIRI kez geçici sorun çıkarsa araç kota yenilenene dek dinlenir: süren bir kesinti
+  her 10 dakikada yeni istek yakarak kotayı bitirmesin.
+- Aynı anda tek zamanlayıcı çalışır (cli.py, kilit.tek_kopya); alt süreç de eser başına kilit alır.
 """
 from __future__ import annotations
 
@@ -20,11 +23,10 @@ import json
 import time
 from dataclasses import dataclass, field
 from typing import Callable
-from zoneinfo import ZoneInfo
 
 from . import olcum
 from .durum import SABIT, UYARLAMALI, Durum, DurumDeposu
-from .gemini import Arac
+from .gemini import KOTA_SAAT_DILIMI, Arac
 from .hazirlik import KuyrukIsi, kuyruk
 from .isci import Cikis, IsTanimi, calistir
 from .katalog import Katalog
@@ -40,8 +42,8 @@ SABIT_KAPASITE = 25000   # kr/gün; sabit bloklu araç (3.1) için kaba tahmin
 HATA_SINIRI = 2
 HATA_BEKLEMESI = 600     # sn
 GECICI_BEKLEMESI = 600   # sn
+GECICI_SINIRI = 3        # üst üste bu kadar geçici sorunda araç kota yenilenene dek dinlenir
 ONARIM_SINIRI = 1
-KOTA_SAAT_DILIMI = ZoneInfo("America/Los_Angeles")
 
 # kazanç sırası (28 Ekim ölçümü). 3.1 uzun blokları güvenlikte reddediyor: kısa sabit blok, fırsat aracı.
 ARACLAR = (
@@ -57,6 +59,7 @@ class AracDurumu:
     gunluk: int               # günlük istek hakkı (0: park edilmiş araç, ertesi gün de iş almaz)
     kota_var: bool = True
     kapasite: float = 0.0     # günde okuyabileceği tahmini karakter
+    gecici: int = 0           # üst üste geçici sorun sayısı
 
     @property
     def model(self) -> str:
@@ -256,6 +259,7 @@ class Zamanlayici:
         self.b.bekle(bitis)
         for x in self.araclar:
             x.kota_var = True
+            x.gecici = 0
 
     def _birak(self, a: AracDurumu, ad: str, isim: str, neden: str) -> None:
         with self.depo.degistir() as d:
@@ -263,6 +267,7 @@ class Zamanlayici:
         self.b.kayit(f"BIRAKILDI {isim} — {a.arac.ad}: {neden}; başka araçla baştan okunacak")
 
     def _sonuc(self, a: AracDurumu, ad: str, isim: str, cikis: Cikis) -> None:
+        a.gecici = a.gecici + 1 if cikis is Cikis.GECICI else 0
         if cikis is Cikis.KOTA:
             a.kota_var = False
             self.b.kayit(f"{a.arac.ad} kotası doldu; {isim} yarın aynı araçla kaldığı yerden sürecek")
@@ -270,6 +275,10 @@ class Zamanlayici:
             self._birak(a, ad, isim, "güvenlik filtresi reddetti")
         elif cikis is Cikis.BOLUNEMEZ:
             self._birak(a, ad, isim, "model boş yanıt veriyor")
+        elif cikis is Cikis.GECICI and a.gecici >= GECICI_SINIRI:
+            a.kota_var = False
+            self.b.kayit(f"GEÇİCİ SORUN {a.gecici} kez üst üste: {a.arac.ad} kota yenilenene dek dinleniyor "
+                         f"(kota boşa yanmasın); {isim} kaldığı yerden sürecek")
         elif cikis is Cikis.GECICI:
             self.b.kayit(f"GEÇİCİ SORUN: {isim}; {GECICI_BEKLEMESI // 60} dk sonra yeniden denenecek")
             self.b.bekle(self.b.simdi() + dt.timedelta(seconds=GECICI_BEKLEMESI))

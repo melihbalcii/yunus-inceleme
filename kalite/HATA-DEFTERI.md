@@ -75,3 +75,10 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
 - **Kök neden:** Eklentinin yalnız Linux'ta çalıştığı kontrol edilmedi.
 - **Tür denetimi:** Kontrol listesi S2; bir ölçümün düşmesi artık öbürlerini durdurmuyor.
 - **Durum:** Düzeltildi (Scorecard ayrı Linux işinde).
+
+### H-013 · Bölünemeyen blok "bölünecek" diye kalıcı işaretleniyordu
+- **Bulan:** Mevcut test (test_isci_cli), birleştirmeden önce · **Önem:** orta · **Tür:** Kalıcı durum (K3)
+- **Kök neden:** Boş yanıtta blok, bölünüp bölünemeyeceğine bakılmadan diske "bölünecek" diye işaretleniyordu. Tek
+  paragraflık blokta bu, geçici bir boş yanıttan sonra bloğun bir daha hiç denenmemesi demekti.
+- **Tür denetimi:** test_tek_paragraflik_blok_bos_yanitta_kalici_isaretlenmez.
+- **Durum:** Düzeltildi (iyilestirme dalı).

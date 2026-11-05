@@ -68,6 +68,18 @@ class Yollar:
         return self.tmp / "fola-sirayla.log"
 
     @property
+    def istek_defteri(self) -> Path:
+        """Gemini'ye atılan her istek ve sonucu (gemini.GeminiTTS); boşa giden istekler buradan ölçülür."""
+        return self.tmp / "istek-defteri.jsonl"
+
+    @property
+    def zamanlayici_kilidi(self) -> Path:
+        return self.tmp / "zamanlayici.kilit"
+
+    def eser_kilidi(self, ad: str) -> Path:
+        return self.tmp / "kilit" / f"{ad}.kilit"
+
+    @property
     def python(self) -> Path:
         return self.kok / ".venv-ses" / "bin" / "python"
 

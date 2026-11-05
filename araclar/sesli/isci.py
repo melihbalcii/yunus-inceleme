@@ -13,6 +13,7 @@ from . import gemini as G
 from .ayar import gerekli
 from .hazirlik import metni_hazirla
 from .katalog import Katalog
+from .kilit import ZatenCalisiyor, tek_kopya
 from .kontrol import kontrol_et
 from .okuma import BolunemezHata, OkumaAyari, Okuyucu, Seslendirici
 from .yollar import Yollar
@@ -62,7 +63,27 @@ def calistir(is_: IsTanimi, yollar: Yollar) -> Cikis:
 
 
 def _gercek_tts(arac: G.Arac, yollar: Yollar, bildir: Callable[[str], None]) -> Seslendirici:
-    return G.GeminiTTS(arac, gerekli(yollar.gemini_env, "GEMINI_API_KEY"), bildir=bildir)
+    return G.GeminiTTS(arac, gerekli(yollar.gemini_env, "GEMINI_API_KEY"), bildir=bildir,
+                       defter=G.dosya_defteri(yollar.istek_defteri))
+
+
+def _oku_ve_denetle(is_: IsTanimi, yollar: Yollar,
+                    tts_kur: Callable[[G.Arac, Yollar, Callable[[str], None]], Seslendirici],
+                    bildir: Callable[[str], None]) -> Cikis:
+    eser = Katalog.yukle(yollar).al(is_.ad)
+    metin = metni_hazirla(eser, yollar)
+    fola = yollar.fola_klasoru(eser.ad)
+    arac = G.Arac(is_.arac_adi, is_.model, is_.ses, is_.sabit_blok)
+    tts = tts_kur(arac, yollar, bildir)
+    ayar = OkumaAyari(model=is_.model, ses=is_.ses, ortak=is_.ortak, hedef_sn=is_.hedef_sn,
+                      sabit_blok=is_.sabit_blok, siir=eser.siir)
+    Okuyucu(tts, ayar, yollar, bildir=bildir).eseri_oku(metin, fola / f"{eser.ad}.mp3")
+    (fola / "motor.json").write_text(json.dumps({"motor": arac.ad, "model": arac.model, "ses": arac.ses},
+                                                ensure_ascii=False), encoding="utf-8")
+    sonuc = kontrol_et(fola, yollar.parcalar, bildir=lambda s: None)
+    bildir(f"kontrol: eşleşme %{sonuc.eslesme:.2f}, 0,90 altı {sonuc.dusuk}, atlama {len(sonuc.atlamalar)}"
+           + ("" if sonuc.gecti else " — GEÇMEDİ"))
+    return Cikis.TAMAM
 
 
 def oku_eser(is_: IsTanimi, yollar: Yollar,
@@ -73,20 +94,11 @@ def oku_eser(is_: IsTanimi, yollar: Yollar,
         print(s, flush=True)
 
     try:
-        eser = Katalog.yukle(yollar).al(is_.ad)
-        metin = metni_hazirla(eser, yollar)
-        fola = yollar.fola_klasoru(eser.ad)
-        arac = G.Arac(is_.arac_adi, is_.model, is_.ses, is_.sabit_blok)
-        tts = tts_kur(arac, yollar, bildir)
-        ayar = OkumaAyari(model=is_.model, ses=is_.ses, ortak=is_.ortak, hedef_sn=is_.hedef_sn,
-                          sabit_blok=is_.sabit_blok, siir=eser.siir)
-        Okuyucu(tts, ayar, yollar, bildir=bildir).eseri_oku(metin, fola / f"{eser.ad}.mp3")
-        (fola / "motor.json").write_text(json.dumps({"motor": arac.ad, "model": arac.model, "ses": arac.ses},
-                                                    ensure_ascii=False), encoding="utf-8")
-        sonuc = kontrol_et(fola, yollar.parcalar, bildir=lambda s: None)
-        bildir(f"kontrol: eşleşme %{sonuc.eslesme:.2f}, 0,90 altı {sonuc.dusuk}, atlama {len(sonuc.atlamalar)}"
-               + ("" if sonuc.gecti else " — GEÇMEDİ"))
-        return Cikis.TAMAM
+        with tek_kopya(yollar.eser_kilidi(is_.ad)):  # aynı eseri iki süreç aynı anda okumasın
+            return _oku_ve_denetle(is_, yollar, tts_kur, bildir)
+    except ZatenCalisiyor as h:
+        bildir(f"GEÇİCİ SORUN: {is_.ad} şu an başka bir süreçte okunuyor; {h}")
+        return Cikis.GECICI
     except G.KotaDoldu:
         bildir("KOTA_DOLDU: günlük ücretsiz kota bitti; yarın kaldığı yerden sürer.")
         return Cikis.KOTA
