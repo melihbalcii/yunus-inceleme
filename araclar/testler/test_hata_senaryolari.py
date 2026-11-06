@@ -288,6 +288,33 @@ class ZamanlayiciGeciciTesti(GeciciKokTesti):
         self.assertGreater(s.beklemeler[-1] - s.beklemeler[-2], Z.dt.timedelta(hours=1))
 
 
+class GecikmeUyarisiTesti(unittest.TestCase):
+    """Yanıt geciktikçe uyarı her istek_suresi dolunda bir kez yazılır; aynı isteğin yanıtı beklenir."""
+
+    def test_uyari_araliklari(self):
+        from unittest import mock
+        bitti = threading.Event()
+        zaman = [0.0]
+
+        def saat():
+            zaman[0] += 100.0
+            if zaman[0] >= 1000:
+                bitti.set()
+            return zaman[0]
+        istemci = SayanIstemci([lambda: (bitti.wait(10), _yanit(_wav(0.1)))[1]])
+        mesajlar: list[str] = []
+        t = G.GeminiTTS(G.Arac("Deneme TTS", "deneme-model", "Fola"), "anahtar", istek_suresi=150,
+                        en_uzun_bekleme=100_000, bildir=mesajlar.append, uyu=lambda s: None,
+                        saat=saat, istemci_kur=lambda: istemci)
+        gercek_join = threading.Thread.join
+        with mock.patch.object(threading.Thread, "join", lambda self, timeout=None: gercek_join(self, 0.01)):
+            t.uret("metin")
+        uyari = [m for m in mesajlar if m.startswith("yanıt gecikiyor")]
+        self.assertEqual(uyari, [f"yanıt gecikiyor ({d} dk); aynı isteğin yanıtı bekleniyor" for d in (3, 5, 8, 10, 13, 15)],  # başlangıç 100. sn, uyarı her 150 sn
+                         mesajlar)
+        self.assertEqual(istemci.cagri, 1)
+
+
 class KilitIletisiTesti(GeciciKokTesti):
     def test_kilit_dosyasi_tutan_sureci_yazar_ileti_onu_gosterir(self):
         import os
