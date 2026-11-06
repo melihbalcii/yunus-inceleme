@@ -77,5 +77,79 @@ class CliTesti(GeciciKokTesti):
             cli.main(["yok"], yollar=self.y)
 
 
+class AyristiriciTesti(unittest.TestCase):
+    def ayir(self, *arg: str):
+        return cli.ayristirici().parse_args(list(arg))
+
+    def test_komutlar_dogru_isleve_gider(self):
+        for arg, isl in ((["durum"], cli._durum), (["oku"], cli._oku), (["kontrol", "x"], cli._kontrol),
+                         (["ceviri", "x"], cli._ceviri), (["hazirla", "x"], cli._hazirla), (["teslim"], cli._teslim),
+                         (["site"], cli._site),
+                         (["oku-eser", "x", "--arac-adi", "A", "--model", "m", "--ses", "Fola", "--hedef-sn", "9"],
+                          cli._oku_eser)):
+            self.assertIs(self.ayir(*arg).is_, isl, arg)
+
+    def test_oku_gunluk_haklari_varsayilan_10_tamsayi(self):
+        a = self.ayir("oku")
+        self.assertEqual((a.lite, a.flash, a.k31), (10, 10, 10))
+        a = self.ayir("oku", "--k31", "0", "--lite", "3")
+        self.assertEqual((a.lite, a.flash, a.k31), (3, 10, 0))
+
+    def test_oku_eser_zorunlulari_ve_plan_secenegi(self):
+        temel = ["oku-eser", "x", "--arac-adi", "A", "--model", "m", "--ses", "Fola"]
+        a = self.ayir(*temel, "--sabit-blok", "3400", "--ortak", "m2,m3")
+        self.assertEqual((a.ad, a.arac_adi, a.model, a.ses, a.ortak, a.sabit_blok, a.hedef_sn),
+                         ("x", "A", "m", "Fola", "m2,m3", 3400, None))
+        for eksik in (temel, temel + ["--hedef-sn", "1", "--sabit-blok", "2"], temel[:2] + ["--hedef-sn", "1"]):
+            with self.subTest(eksik=eksik), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                self.ayir(*eksik)
+
+    def test_teslim_adi_istege_bagli_site_kuru_bayragi(self):
+        self.assertIsNone(self.ayir("teslim").ad)
+        self.assertEqual(self.ayir("teslim", "x").ad, "x")
+        self.assertFalse(self.ayir("site").kuru)
+        self.assertTrue(self.ayir("site", "--kuru").kuru)
+
+    def test_yardim_metni_komutlari_turkce_anlatir(self):
+        yardim = cli.ayristirici().format_help()
+        for parca in ("eserlerin ve okumanın durumu", "zamanlayıcıyı başlatır", "okunmuş eseri yeniden kontrol eder",
+                      "çeviri bölümlerini birleştirir", "okuma metnini günceller",
+                      "kontrolden geçen okumaları teslim eder", "site yayın klasörünü hazırlar"):
+            self.assertIn(parca, yardim)
+
+
+class DurumCiktisiTesti(CliTesti):
+    def test_durum_her_eserin_durumunu_ve_bugunku_istekleri_yazar(self):
+        from sesli.kota import kota_gunu
+        import datetime as dt
+        self.metin_yaz("kisa-oyku", ["kısa"])
+        self.metin_yaz("uzun-roman", ["uzun " * 50])
+        self.y.durum.write_text(json.dumps({"atama": {"uzun-roman": "m1"}}))
+        teslim = self.y.teslim / "Gemini 3.8 Flash"
+        teslim.mkdir()
+        (teslim / "01 - Kısa Öykü - Yazar Bir.mp3").write_bytes(b"x")
+        fola = self.y.fola_klasoru("uzun-roman")
+        fola.mkdir(parents=True, exist_ok=True)
+        (fola / "kontrol.json").write_text(json.dumps({"eslesme": 96.5, "bloklar": []}))
+        zaman = dt.datetime.now().astimezone().strftime("%Y-%m-%dT%H:%M:%S%z")
+        self.y.istek_defteri.write_text("".join(json.dumps({"zaman": zaman, "sonuc": s}) + "\n"
+                                                for s in ("ses", "ses", "ses", "kayip", "gitmedi")))
+        kod, cikti = self.calistir("durum")
+        self.assertEqual(kod, 0)
+        satir = {x.split()[0]: x for x in cikti.splitlines() if x[:3].strip().isdigit()}
+        self.assertIn("teslim edildi (Gemini 3.8 Flash)", satir["1"])
+        self.assertIn("okunuyor: m1; kontrol %96.50 GEÇMEDİ", satir["2"])
+        self.assertIn("okunmayacak (Emel'li kopyası yok, yalniz_fola değil)", satir["3"])
+        self.assertNotIn("4", satir, "vazgeçilen eser listelenmez")
+        self.assertIn("Kuyruk (kısadan uzuna): uzun-roman (", cikti)
+        self.assertIn(f"Bugünkü istekler (kota günü {kota_gunu()}): 4 kota harcayan istek, 3 ses geldi, 1 boşa gitti "
+                      "(%25); ayrıntı: gitmedi 1, kayip 1, ses 3", cikti)
+
+    def test_istek_yoksa_bos_kuyruk_ve_sifir_yazar(self):
+        kod, cikti = self.calistir("durum")
+        self.assertEqual(kod, 0)
+        self.assertIn("0 kota harcayan istek, 0 ses geldi, 0 boşa gitti\n", cikti)
+
+
 if __name__ == "__main__":
     unittest.main()
