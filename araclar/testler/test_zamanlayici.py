@@ -430,5 +430,50 @@ class SonucGunluguTesti(GeciciKokTesti):
         self.assertEqual(self.satirlar(s), [f"BİTTİ {self.ISIM} — Lite TTS (Fola)"])
 
 
+class SecimTesti(unittest.TestCase):
+    """sec(): aracın yarım eseri > ortak okuduğu eser > öncelikli eser > payı > sahipsiz en uzun eser."""
+
+    def araclar(self, gunluk=(10, 10, 10), kota=(True, True, True)):
+        return [Z.AracDurumu(a, g, kota_var=k, kapasite=100_000) for a, g, k in zip((LITE, FLASH, K31), gunluk, kota)]
+
+    def sec(self, durum, boy, **ayar):
+        r = Z.sec(self.araclar(**ayar), durum, boy)
+        return None if r is None else (r[0].model, r[1])
+
+    def test_oncelik_sirasi(self):
+        from sesli.durum import Durum
+        boy = {"a": 100, "b": 200, "c": 300, "d": 400}
+        self.assertEqual(self.sec(Durum(atama={"b": "lite"}), boy), ("lite", "b"), "yarım eser önce")
+        self.assertEqual(self.sec(Durum(atama={"b": "flash"}, ortak={"c": ["lite"]}), boy), ("lite", "c"),
+                         "ortak okuduğu eser")
+        self.assertEqual(self.sec(Durum(oncelik=["yok", "a"]), boy), ("lite", "a"), "öncelikli eser, kuyrukta olan")
+        self.assertEqual(self.sec(Durum(), boy), ("lite", "a"), "pay: en uzundan dağıtılır (lite: d, a), kısası önce")
+
+    def test_atanmis_ve_reddedilmis_eser_onceliklide_atlanir(self):
+        from sesli.durum import Durum
+        boy = {"a": 100, "b": 200}
+        self.assertEqual(self.sec(Durum(oncelik=["a", "b"], atama={"a": "flash"}), boy), ("lite", "b"))
+        self.assertEqual(self.sec(Durum(oncelik=["a", "b"], ret={"lite": ["a"]}), boy), ("lite", "b"))
+
+    def test_kotasi_bitmis_ya_da_park_edilmis_arac_atlanir(self):
+        from sesli.durum import Durum
+        boy = {"a": 100, "b": 50}
+        for ayar in ({"kota": (False, True, True)}, {"gunluk": (0, 10, 10)}):
+            self.assertEqual(self.sec(Durum(atama={"a": "lite"}), boy, **ayar), ("flash", "b"),
+                             "lite'ın eseri başka araca geçmez (bir eserde ses değişmez)")
+        self.assertIsNone(self.sec(Durum(), boy, kota=(False, False, False)))
+
+    def test_sabit_bloklu_arac_oncelik_almaz_kalan_en_uzun_eseri_kapar(self):
+        from sesli.durum import Durum
+        boy = {"a": 100, "b": 300}
+        durum = Durum(oncelik=["a"], ret={"lite": ["a", "b"], "flash": ["a", "b"]})
+        self.assertEqual(self.sec(durum, boy), ("k31", "b"), "pay yok: reddetmediği en uzun sahipsiz eser")
+        self.assertIsNone(self.sec(Durum(ret={"lite": ["a"], "flash": ["a"], "k31": ["a"]}), {"a": 1}))
+
+    def test_ortak_listesindeki_bitmis_eser_secilmez(self):
+        from sesli.durum import Durum
+        self.assertEqual(self.sec(Durum(ortak={"bitti": ["lite"]}), {"a": 100}), ("lite", "a"))
+
+
 if __name__ == "__main__":
     unittest.main()
