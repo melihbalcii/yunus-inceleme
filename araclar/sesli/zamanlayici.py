@@ -191,7 +191,7 @@ def gercek_bagimliliklar(yollar: Yollar) -> Bagimliliklar:
 def bosa_giden(yollar: Yollar) -> int:
     """Bugünkü kota gününde kotayı harcayıp ses getirmeyen istek sayısı (kayıp, zaman aşımı, boş, ret, hata)."""
     sayac = olcum.istek_ozeti(yollar.istek_defteri, kota_gunu())
-    return sum(n for sonuc, n in sayac.items() if sonuc not in ("ses", "gitmedi", "sinir"))
+    return sum(sayac.get(sonuc, 0) for sonuc in olcum.BOSA_GIDEN)
 
 
 def sorunlu_bloklari_sil(ad: str, yollar: Yollar) -> int:
