@@ -63,5 +63,20 @@ class SonrakiSinirTesti(unittest.TestCase):
         self.assertEqual(M.sonraki_sinir(par, 0, hiz=1, hedef_sn=100), 1)
 
 
+class ParagrafBolmeTesti(unittest.TestCase):
+    def test_uzun_paragraf_ucte_iki_sinirla_cumle_cumle_toplanir(self):
+        cumleler = " ".join(f"C{i} " + "x" * 20 + "." for i in range(10))  # her cümle 24 kr
+        par = M.paragraflar("Önce.\n\n" + cumleler + "\n\n— . . .\n\nSon\xadra.", en_cok=90)  # sınır 60
+        self.assertEqual([len(p.metin) for p in par], [5, 49, 49, 49, 49, 49, 6])
+        self.assertEqual([p.devam for p in par], [False, False, True, True, True, True, False])
+        self.assertEqual(par[-1].metin, "Sonra.", "yumuşak tire atılır, sessiz satır atlanır")
+        self.assertEqual(M.birlestir(par), "Önce.\n\n" + cumleler + "\n\nSonra.")
+
+    def test_tam_sinirdaki_paragraf_bolunmez(self):
+        p = "a" * 59 + "."
+        self.assertEqual(M.paragraflar(p, en_cok=60), [M.Paragraf(p, False)])
+        self.assertEqual(len(M.paragraflar(p + " b.", en_cok=60)), 2)
+
+
 if __name__ == "__main__":
     unittest.main()
