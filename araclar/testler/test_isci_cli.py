@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import contextlib
 import io
 import json
@@ -159,6 +160,21 @@ class AyristiriciTesti(unittest.TestCase):
         self.assertEqual(self.ayir("teslim", "x").ad, "x")
         self.assertFalse(self.ayir("site").kuru)
         self.assertTrue(self.ayir("site", "--kuru").kuru)
+
+    def test_alt_komut_kullanimi_ve_secenek_yardimi(self):
+        ap = cli.ayristirici()
+        self.assertEqual(ap.format_usage(), "usage: sesli_kitap.py [-h] komut ...\n")
+        self.assertIn("Sesli kitap üretim sistemi", ap.format_help())
+        alt = next(a for a in ap._actions if isinstance(a, argparse._SubParsersAction)).choices
+        yardim = {ad: " ".join(p.format_help().split()) for ad, p in alt.items()}
+        for ad in ("3.8 Flash Lite", "3.8 Flash", "3.1 Flash"):
+            self.assertIn(f"{ad} günlük istek hakkı (0: kullanma)", yardim["oku"])
+        self.assertIn("--kuru hiçbir şey yazmadan sonucu göster", yardim["site"])
+        self.assertIn("usage: sesli_kitap.py teslim [-h] [ad]", yardim["teslim"])
+        self.assertIn("--arac-adi ARAC_ADI --model MODEL --ses SES [--ortak ORTAK] "
+                      "(--hedef-sn HEDEF_SN | --sabit-blok SABIT_BLOK) ad", yardim["oku-eser"])
+        for ad in ("kontrol", "ceviri", "hazirla"):
+            self.assertIn(f"usage: sesli_kitap.py {ad} [-h] ad", yardim[ad])
 
     def test_yardim_metni_komutlari_turkce_anlatir(self):
         yardim = cli.ayristirici().format_help()
