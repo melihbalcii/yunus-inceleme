@@ -152,6 +152,41 @@ class HazirlikTesti(GeciciKokTesti):
         self.assertEqual(d.read_text(encoding="utf-8"), "Eser. Yazar.\n\nA.\n\nB.\n\nEser'i dinlediniz.\n")
 
 
+class BirlesikParagrafTesti(GeciciKokTesti):
+    """Parçalı eserler (kısım, bölüm, boy) tek okuma metnine: hiçbir bölüm atlanmamalı ya da iki kez okunmamalı."""
+
+    def parcalar(self, tur, *parcalar):
+        from sesli.hazirlik import birlesik_paragraflar
+        k = self.kok / "eser"
+        for n, ps in enumerate(parcalar, 1):
+            (k / f"{tur}-{n:02d}" if tur == "boy" else k / f"{tur}-{n}").mkdir(parents=True)
+            d = (k / f"{tur}-{n:02d}") if tur == "boy" else (k / f"{tur}-{n}")
+            (d / "seslendirme-metni.txt").write_text("\n\n".join(ps), encoding="utf-8")
+        return birlesik_paragraflar(k)
+
+    def test_boylar_giris_ve_kapanislar_tek_kez_kalir(self):
+        sonuc = self.parcalar("boy",
+                              ["Dede Korkut Hikâyeleri. Birinci boy: Dirse Han.", "A.", "Birinci boyunu dinlediniz."],
+                              ["Dede Korkut Hikâyeleri. İkinci boy: Bamsı.", "B.", "Dede Korkut'un ikinci boyunu dinlediniz."])
+        self.assertEqual(sonuc, ["Dede Korkut Hikâyeleri. Birinci boy: Dirse Han.", "A.", "İkinci boy: Bamsı.", "B.",
+                                 "Dede Korkut'u dinlediniz."])
+
+    def test_kapanissiz_boy_hata(self):
+        from sesli.hazirlik import MetinHatasi
+        with self.assertRaises(MetinHatasi):
+            self.parcalar("boy", ["Eser. Birinci boy.", "A."], ["Eser. İkinci boy.", "B.", "dinlediniz."])
+
+    def test_bolumlerde_sira_basligi_bir_kez_kalir(self):
+        sonuc = self.parcalar("bolum", ["Eser. Yazar. Birinci bölüm.", "Birinci bölüm.", "A.", "Birinci bölümün sonu."],
+                              ["Eser. İkinci bölüm.", "İkinci bölüm.", "B.", "Eserin ikinci bölümünü dinlediniz."])
+        self.assertEqual(sonuc, ["Eser. Yazar.", "A.", "B.", "Eseri dinlediniz."])
+
+    def test_gecis_duyurusu_olmayan_parca_hata(self):
+        from sesli.hazirlik import MetinHatasi
+        with self.assertRaises(MetinHatasi):
+            self.parcalar("kisim", ["Eser. Birinci kısım.", "A.", "Burada duyuru yok."], ["Eser. İkinci kısım.", "B."])
+
+
 class KontrolSonucuTesti(GeciciKokTesti):
     """Teslimin son kapısı: eşikler sınır değerlerde doğru, kayıt okunup yazılınca aynı kalır."""
 
