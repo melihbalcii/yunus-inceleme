@@ -9,7 +9,7 @@
   --yuzey-3: #2f2f2f;
   --yazi: #ffffff;
   --soluk: #a7a7a7;
-  --soluk-2: #6f6f6f;
+  --soluk-2: #878787;  /* koyu zeminde okunabilirlik: #121212 üstünde 5,2, #1c1c1c üstünde 4,75 (en az 4,5) */
   --vurgu: #2fd36b;
   --vurgu-koyu: #1fae55;
   --f: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;

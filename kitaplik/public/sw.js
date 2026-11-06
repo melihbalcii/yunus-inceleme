@@ -1,14 +1,16 @@
 // Melih'ten Dinle: anında açılış, internetsiz açılış ve telefona indirilmiş eserleri çalma.
-// İndirilen parçalar telefonun Cache Storage'ında ("indirilenler-v1") durur; uygulama.js indirir, burası verir.
+// İndirilen parçalar telefonun Cache Storage'ında ("indirilenler-v1") durur; program (js/) indirir, burası verir.
 // Çalar parçaları parça parça (Range) ister: önbellekteki dosyadan istenen bayt aralığı 206 ile döner.
 // 2 Kasım 2026 (kullanıcı: "telefondan açınca yavaş, beyaz ekran"): sayfa, program ve görünüm dosyası telefondaki
 // kopyadan BEKLEMEDEN açılır, güncel hâli arkadan iner; değişmişse sayfaya "yeni sürüm" haberi gider.
-// Önceden ağ 3 sn beklendiği için mobil internette her açılış gecikiyordu. Katalog uygulama.js'te zaten
+// Önceden ağ 3 sn beklendiği için mobil internette her açılış gecikiyordu. Katalog programda zaten
 // önce kopyadan açıldığından ağdan alınır (yeni eser hemen görünsün).
 // 3 Kasım 2026 (kullanıcı: "metin işini siteden ve sistemimizden çıkaralım"): Oku sekmesi kaldırıldı; telefonlarda
 // kalmış metin önbelleği ("metinler-v1") ilk açılışta silinir
-const KABUK = "kabuk-v5", DEPO = "indirilenler-v1";
-const DOSYALAR = ["/", "/uygulama.js", "/stil.css", "/simge-192.png", "/simge.svg"];
+const KABUK = "kabuk-v6", DEPO = "indirilenler-v1";
+// program js/ altında sırayla yüklenen parçalar (index.html ile aynı liste)
+const PROGRAM = ["/js/1-temel.js", "/js/2-sayfalar.js", "/js/3-calar.js", "/js/4-olaylar.js", "/js/5-sozler.js", "/js/6-soz-rozet.js", "/js/7-hikaye-paylas.js", "/js/8-baslangic.js"];
+const DOSYALAR = ["/", ...PROGRAM, "/stil.css", "/simge-192.png", "/simge.svg"];
 const AGDAN = ["/katalog.json", "/yakinda.json"];
 
 self.addEventListener("install", (e) => {
@@ -55,7 +57,7 @@ async function kopyaOnce(e, u) {
   const ag = agdanAl(e, u);
   if (!kopya) return ag.catch(() => Response.error());
   e.waitUntil(ag.then(async (r) => {
-    if (u.pathname !== "/uygulama.js" || !r.ok || r.redirected) return;
+    if (!PROGRAM.includes(u.pathname) || !r.ok || r.redirected) return;
     if ((await r.clone().text()) === (await kopya.clone().text())) return;
     for (const c of await self.clients.matchAll()) c.postMessage({ tip: "yeni-surum" });
   }).catch(() => {}));

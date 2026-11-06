@@ -75,8 +75,12 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
   Stryker, netlify-cli alt paketleri) 35 açık kaldı, 0 kritik; siteye ve okumaya girmez, npm'in önerdiği "düzeltme"
   araçların eski sürümlerine dönmek. **Durum:** Düzeltildi (çalışma zamanı); geliştirme araçları izleniyor.
 
-### H-009 · Ana sayfada 20 yerde yetersiz renk kontrastı
-- **Bulan:** axe, Lighthouse · **Tür:** Erişilebilirlik (O1) · **Durum:** Açık.
+### H-009 · Ana sayfada yetersiz renk kontrastı
+- **Bulan:** axe, Lighthouse · **Tür:** Erişilebilirlik (O1)
+- **İnceleme:** İlk ölçümdeki 20 bulgu, sitenin eser listesi olmadan (boş sayfa) ölçülmesindendi. Gerçek sayfa ölçülünce
+  (örnek eser listesiyle) 4 gerçek bulgu kaldı: ikincil gri yazı (`--soluk-2` #6f6f6f) koyu zeminde 3,72 oranındaydı.
+- **Düzeltme:** #878787 (#121212 üstünde 5,2; #1c1c1c üstünde 4,75; eşik 4,5). axe: 0 bulgu. **Durum:** Düzeltildi
+  (siteye yayın kullanıcı onayıyla).
 
 ### H-010 · Testler koda sokulan hataların yalnız %57'sini yakalıyor
 - **Bulan:** mutmut (mutasyon testi) · **Tür:** Zayıf test · **Tür denetimi:** Mutasyon puanı her gönderimde ölçülür.

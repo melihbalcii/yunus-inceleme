@@ -79,7 +79,7 @@ if adim boyut; then
 import ast, json, sys
 from pathlib import Path
 dosyalar = (sorted(Path("araclar/sesli").glob("*.py")) + [Path("araclar/sesli_kitap.py")]
-            + sorted(Path("kitaplik/netlify").rglob("*.ts")) + [Path("kitaplik/public/uygulama.js"), Path("kitaplik/public/sw.js")])
+            + sorted(Path("kitaplik/netlify").rglob("*.ts")) + sorted(Path("kitaplik/public/js").glob("*.js")) + [Path("kitaplik/public/sw.js")])
 mod, fonk, satir = [], 0, 0
 for p in dosyalar:
     yazi = p.read_text(encoding="utf-8")

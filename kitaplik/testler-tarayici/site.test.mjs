@@ -32,7 +32,7 @@ const KOTU = '"><img src=x onerror="window.__xss=1">';
 
 let sunucu, adres, tarayici;
 // Ön yüz test kapsamı (puanlama "Ön yüz test kapsamı"): KAPSAM_DOSYASI verilirse Chromium'un kod kapsamıyla
-// uygulama.js'in testlerde çalışan satır oranı yazılır.
+// programın (public/js/) testlerde çalışan satır oranı yazılır.
 const kapsamlar = [];
 before(async () => {
   sunucu = createServer(async (istek, yanit) => {
@@ -60,6 +60,12 @@ after(async () => {
 // V8 blok kapsamı → satır kapsamı: bir satır, boş olmayan bir karakteri çalıştıysa kapsanmış sayılır.
 function satirKapsami(girdiler) {
   if (!girdiler.length) return null;
+  const sonuc = [...Map.groupBy(girdiler, (g) => g.url).values()].map(dosyaKapsami);
+  const kapsanan = sonuc.reduce((a, x) => a + x.kapsanan, 0), toplam = sonuc.reduce((a, x) => a + x.toplam, 0);
+  return { satir: Math.round((1000 * kapsanan) / toplam) / 10, kapsanan, toplam, dosya: sonuc.length };
+}
+
+function dosyaKapsami(girdiler) {
   const kaynak = girdiler[0].source;
   const calisti = new Uint8Array(kaynak.length);
   for (const g of girdiler) {
@@ -76,7 +82,7 @@ function satirKapsami(girdiler) {
     }
     i += satir.length + 1;
   }
-  return { satir: Math.round((1000 * kapsanan) / toplam) / 10, kapsanan, toplam };
+  return { kapsanan, toplam };
 }
 
 async function sayfa(depo) {
@@ -95,7 +101,7 @@ async function sayfa(depo) {
   await p.goto(`${adres}/index.html`);
   await p.waitForFunction(() => document.querySelector("#icerik")?.innerHTML.length > 0);
   const kapat = async () => {
-    kapsamlar.push(...(await p.coverage.stopJSCoverage()).filter((x) => x.url.endsWith("/uygulama.js")));
+    kapsamlar.push(...(await p.coverage.stopJSCoverage()).filter((x) => new URL(x.url).pathname.startsWith("/js/")));
     await baglam.close();
   };
   return { p, hatalar, kapat };
