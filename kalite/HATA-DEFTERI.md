@@ -172,3 +172,10 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
   sürdüğü için sık gönderimde hiçbiri tamamlanmadı. Ayrıca takılan bir ölçüm 5 saatlik sınıra kadar sırayı kilitledi.
 - **Düzeltme:** `cancel-in-progress: false` (çalışan biter, sırada yalnız en son gönderim bekler); süre sınırı 3 saat.
 - **Durum:** Düzeltildi.
+
+### H-022 · Model ailesi tutarsız ayrılıyordu (3.8 Flash ile 3.1 aynı aile sayılıyordu)
+- **Bulan:** Mutasyon testi (zamanlayici._aile kaçakları incelenirken), 6 Kasım 2026 · **Önem:** orta (gizli)
+- **Kök neden:** Aile, model adının sondan bölünmesiyle bulunuyordu: 3.8 Lite → "gemini-3.8" ama 3.8 Flash ve 3.1 →
+  "gemini". 3.8 için kodda özel bir istisna vardı; 3.1 "kesik" ölçüm kaydetseydi 3.8 Flash'ın blok boyu sessizce küçülürdü.
+- **Düzeltme:** Aile sürüm numarasıdır (gemini-3.8, gemini-3.1, gemini-2.5); istisna kaldırıldı. Gerçek ölçüm dosyasıyla
+  sonuçlar değişmedi (3.8: 1134 sn, 2.5: 470, 3.1: 570). **Tür denetimi:** AileTesti. **Durum:** Düzeltildi.

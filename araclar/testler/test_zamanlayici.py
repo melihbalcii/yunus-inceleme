@@ -475,5 +475,23 @@ class SecimTesti(unittest.TestCase):
         self.assertEqual(self.sec(Durum(ortak={"bitti": ["lite"]}), {"a": 100}), ("lite", "a"))
 
 
+class AileTesti(unittest.TestCase):
+    def test_aile_surum_numarasidir(self):
+        for model, aile in (("gemini-3.8-flash-lite-tts", "gemini-3.8"), ("gemini-3.8-flash-tts", "gemini-3.8"),
+                            ("gemini-3.8-flash-lite-tts-20k", "gemini-3.8"), ("gemini-3.1-flash-tts-preview", "gemini-3.1"),
+                            ("gemini-2.5-flash-preview-tts", "gemini-2.5"), ("gemini-2-tts", "gemini-2"), ("baska", "baska")):
+            self.assertEqual(Z._aile(model), aile, model)
+
+    def test_baska_surumun_kesik_olcumu_hedefi_etkilemez(self):
+        import tempfile
+        from sesli.yollar import Yollar
+        y = Yollar.kok_altinda(Path(tempfile.mkdtemp()))
+        y.tmp.mkdir()
+        y.sinir.write_text(json.dumps({"gemini-3.1-flash-tts-preview": {"sn": 300, "durum": "kesik"},
+                                       "gemini-3.8-flash-lite-tts-20k": {"sn": 1233, "durum": "tam"}}))
+        self.assertEqual(Z.hedef_sn("gemini-3.8-flash-tts", y), 1134)
+        self.assertEqual(Z.hedef_sn("gemini-3.1-flash-tts-preview", y), 470, "3.1 yalnız kendi ölçümünü kullanır")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -21,6 +21,7 @@ from __future__ import annotations
 import contextlib
 import datetime as dt
 import json
+import re
 import time
 from dataclasses import dataclass, field
 from collections.abc import Callable
@@ -71,7 +72,10 @@ class AracDurumu:
 
 
 def _aile(model: str) -> str:
-    return model.split("-tts", maxsplit=1)[0].rsplit("-", 2)[0]
+    """Model ailesi sürüm numarasıdır: gemini-3.8-flash-tts ile gemini-3.8-flash-lite-tts aynı aile (gemini-3.8).
+    Eskiden ad sondan bölünüyordu: 3.8 Flash ve 3.1 "gemini" ailesine düşüyor, birbirinin ölçümünü kullanabiliyordu."""
+    m = re.match(r"gemini-\d+(?:\.\d+)?", model)
+    return m.group(0) if m else model
 
 
 def hedef_sn(model: str, yollar: Yollar) -> int:
@@ -81,8 +85,7 @@ def hedef_sn(model: str, yollar: Yollar) -> int:
         olculen = json.loads(yollar.sinir.read_text())
     except (OSError, ValueError):
         olculen = {}
-    aile = [v for k, v in olculen.items()
-            if _aile(k) == _aile(model) or (k.startswith("gemini-3.8") and model.startswith("gemini-3.8"))]
+    aile = [v for k, v in olculen.items() if _aile(k) == _aile(model)]
     tam = [v["sn"] for v in aile if v.get("durum") == "tam"]
     if tam:
         return int(min(max(max(tam) * 0.92, VARSAYILAN_HEDEF), EN_UZUN_HEDEF))
