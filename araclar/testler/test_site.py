@@ -85,6 +85,15 @@ class CerceveBasligiTesti(unittest.TestCase):
                 self.assertEqual(site.cerceveler(bozuk), [], "bozuk başlık çerçeve sayılmaz")
                 self.assertIn(len(bozuk), [c.bas for c in site.cerceveler(bozuk + gecerli)], "arkasındaki bulunur")
 
+    def test_id3_boyunun_butun_basamaklari_okunur(self):
+        gecerli = _cerceve(3, 9, 0)
+        for basamaklar, boy in (((0, 1, 0, 0), 16384), ((0, 1, 1, 1), 16384 + 128 + 1), ((0, 0, 0, 0), 0)):
+            with self.subTest(boy=boy):
+                id3 = b"ID3\x04\x00\x00" + bytes(basamaklar) + b"\xff" * boy
+                self.assertEqual([c.bas for c in site.cerceveler(id3 + gecerli)], [10 + boy])
+        yarim = b"ID3\x04\x00\x00\x00\x00\x00"  # dosya sonunda 10 bayttan kısa etiket: çökmeden biter
+        self.assertEqual([c.bas for c in site.cerceveler(gecerli + yarim)], [0])
+
     def test_id3_etiketleri_atlanir(self):
         gecerli = _cerceve(3, 9, 0)
         id3v2 = b"ID3\x04\x00\x00" + bytes([0, 0, 1, 0]) + b"\xff" * 128  # eşzamanlı boy: 128
