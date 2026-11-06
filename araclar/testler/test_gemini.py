@@ -280,5 +280,32 @@ class BosYanitTesti(unittest.TestCase):
         self.assertEqual((k["sonuc"], k["ses_sn"]), ("ses", 0.8))
 
 
+class YenidenDenemeBeklemesiTesti(unittest.TestCase):
+    def test_baglanamayinca_ve_yanit_kaybolunca_30_sn_bekler_istemciyi_yeniler(self):
+        import httpx
+        from google.genai import errors
+        uyku: list[float] = []
+        mesaj: list[str] = []
+        kurulum: list[int] = []
+        davranis = [httpx.ConnectError("yok"),
+                    errors.ServerError(503, {"error": {"code": 503, "message": "x", "status": "X"}}), _yanit(_wav(0.1))]
+
+        def kur():
+            kurulum.append(1)
+            return SahteIstemci(davranis)
+        t = G.GeminiTTS(G.Arac("Deneme TTS", "m", "Fola"), "a", bildir=mesaj.append, uyu=uyku.append, istemci_kur=kur)
+        t.uret("x")
+        self.assertEqual(uyku, [30, 30])
+        self.assertEqual(len(kurulum), 3, "her sorundan sonra istemci yeniden kurulur")
+        self.assertTrue(mesaj[0].startswith("bağlanılamadı (kota harcanmadı), tekrar: ConnectError"))
+        self.assertTrue(mesaj[1].startswith("yanıt kayboldu (kota harcanmış olabilir), bir kez daha: ServerError"))
+
+    def test_butce_sifirsa_istek_atilmaz(self):
+        t = G.GeminiTTS(G.Arac("Deneme TTS", "m", "Fola"), "a", bildir=lambda s: None, uyu=lambda s: None,
+                        istemci_kur=lambda: SahteIstemci([]))
+        with self.assertRaisesRegex(G.GeciciHata, "^istek bütçesi bitti$"):
+            t.uret("x", en_cok=0)
+
+
 if __name__ == "__main__":
     unittest.main()

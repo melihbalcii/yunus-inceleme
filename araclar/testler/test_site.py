@@ -356,5 +356,16 @@ class OzetOnbellegiTesti(GeciciKokTesti):
         self.assertRegex(site.OzetOnbellegi(kayit).ozet(mp3), r"^[0-9a-f]{8}$")
 
 
+class YakindaDosyasiTesti(YayinTabani):
+    def test_yakinda_dosyasi_yazilir_numara_yoksa_bos(self):
+        self.kur()
+        (self.y.kitaplik / ".env").write_text("BASKA=1\n")
+        _, yakinda = site.hazirla(self.y, bildir=lambda s: None)
+        self.assertEqual(yakinda["whatsapp"], "")
+        self.assertEqual(json.loads((self.y.yayin / "yakinda.json").read_text(encoding="utf-8")), yakinda)
+        (self.y.kitaplik / ".env").write_text("WHATSAPP= 905551112233 \n")
+        self.assertEqual(site.hazirla(self.y, bildir=lambda s: None, kuru=True)[1]["whatsapp"], "905551112233")
+
+
 if __name__ == "__main__":
     unittest.main()
