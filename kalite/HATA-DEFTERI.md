@@ -32,11 +32,11 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
   Elle yalnız biri bulunmuştu.
 - **Tür denetimi:** Deneme deposu ve testi; kayıt denetimi (haftalik_denetim.py "kaybolmuş olabilecek okuma");
   planlı: çökme testi.
-- **Durum:** Düzeltme gerçek projede yazılıyor, henüz doğrulanmadı.
+- **Durum:** Düzeltildi; çökme testiyle kanıtlandı (H-018 kalan parçasıydı), 6 Kasım'da gerçek projede.
 
 ### H-003 · Okuma programı iki kez başlatılabiliyor
 - **Bulan:** Biz (H-001 incelemesi sırasında) · **Önem:** orta · **Tür:** Aynı anda çalışma (E1)
-- **Tür denetimi:** Tek kopya kilidi testi. **Durum:** Gerçek projede yazılıyor.
+- **Tür denetimi:** Tek kopya kilidi testi. **Durum:** Düzeltildi; 6 Kasım'da gerçek projede (ilk gece kilit doğru çalıştı).
 
 ### H-004 · Sitede adres çubuğundan zararlı kod çalıştırma riski (DOM XSS)
 - **Bulan:** SonarQube, 5 Kasım 2026 · **Önem:** engelleyici · **Tür:** OWASP A05, CWE-79 (G1)
@@ -84,7 +84,7 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
 
 ### H-010 · Testler koda sokulan hataların yalnız %57'sini yakalıyor
 - **Bulan:** mutmut (mutasyon testi) · **Tür:** Zayıf test · **Tür denetimi:** Mutasyon puanı her gönderimde ölçülür.
-- **Durum:** Açık. Hedef %80.
+- **Durum:** Mutasyon puanı %57,1 → %89,0 (6 Kasım; kalan kaçakların 126'sı eşdeğer, onlar hariç ~%91). Hedef %90.
 
 ### H-011 · Kendi koduma 90+ puan verdim, gerçek 64
 - **Bulan:** Bağımsız ölçüm · **Tür:** Süreç (S3)
@@ -130,7 +130,7 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
   çalıştırmada benim elle çıkardığım listede olmayan `.cache/python`'u (Python'un kendisi) yakaladı.
 - **Çözüm:** Finder'da klasöre sağ tıkla → "İndirileni Tut". Kullanıcı 6 Kasım'da üçünü işaretledi; `.cache/python`
   eklenecek.
-- **Durum:** Denetim eklendi; indirme sürüyor.
+- **Durum:** Düzeltildi; 6 Kasım'da okuma ortamı tamamen Mac'te, denetim her oturumda kontrol ediyor.
 
 ### H-017 · İstek sırasında çöken program blok başına günlük tavanı aşabiliyordu
 - **Bulan:** Çökme testi (`testler/test_cokme.py`), 6 Kasım 2026 · **Önem:** yüksek (kota kaybı) · **Tür:** Yarıda kalma (K2)
