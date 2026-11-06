@@ -37,6 +37,64 @@ class CerceveTesti(unittest.TestCase):
         self.assertEqual(len(site.cerceveler(veri[:-10])), len(tam) - 1)
 
 
+def _cerceve(surum: int, bi: int, si: int, *, dolgu: int = 0, tek: bool = False, etiket: bytes = b"",
+             katman: int = 1) -> bytes:
+    """ISO 11172-3 başlığıyla yapay MP3 çerçevesi (Katman III). surum: 3 MPEG-1, 2 MPEG-2, 0 MPEG-2.5."""
+    b1 = 0xE0 | (surum << 3) | (katman << 1) | 1
+    b2 = (bi << 4) | (si << 2) | (dolgu << 1)
+    b3 = (3 << 6) if tek else 0
+    hz = site._ORNEK[surum][si]
+    uzun = (144 if surum == 3 else 72) * site._BIT[1 if surum == 3 else 2][bi] * 1000 // hz + dolgu
+    govde = bytearray(uzun - 4)
+    if etiket:
+        yan = (17 if tek else 32) if surum == 3 else (9 if tek else 17)
+        govde[yan:yan + 4] = etiket
+    return bytes([0xFF, b1, b2, b3]) + bytes(govde)
+
+
+class CerceveBasligiTesti(unittest.TestCase):
+    def test_surumler_uzunluk_ornek_ve_hz(self):
+        for surum, bi, si, uzun, ornek, hz in ((3, 9, 0, 417, 1152, 44100), (3, 14, 1, 960, 1152, 48000),
+                                               (2, 8, 1, 192, 576, 24000), (0, 1, 2, 72, 576, 8000)):
+            with self.subTest(surum=surum, bi=bi):
+                v = _cerceve(surum, bi, si)
+                (c,) = site.cerceveler(v)
+                self.assertEqual((c.bas, c.uzunluk, c.ornek, c.hz), (0, uzun, ornek, hz))
+
+    def test_dolgu_bayti_ve_art_arda_cerceveler(self):
+        v = _cerceve(3, 9, 0, dolgu=1) + _cerceve(3, 9, 0)
+        self.assertEqual([(c.bas, c.uzunluk) for c in site.cerceveler(v)], [(0, 418), (418, 417)])
+
+    def test_xing_ve_info_cercevesi_atlanir_konumu_surume_gore(self):
+        for surum, tek in ((3, False), (3, True), (2, False), (2, True)):
+            for etiket in (b"Xing", b"Info"):
+                with self.subTest(surum=surum, tek=tek, etiket=etiket):
+                    bi, si = (9, 0) if surum == 3 else (8, 1)
+                    v = _cerceve(surum, bi, si, tek=tek, etiket=etiket) + _cerceve(surum, bi, si, tek=tek)
+                    self.assertEqual(len(site.cerceveler(v)), 1, "VBR başlığı ses sayılmaz")
+        yanlis_yer = bytearray(_cerceve(3, 9, 0))
+        yanlis_yer[4 + 17:4 + 21] = b"Xing"  # çift kanallı MPEG-1'de etiket 32. baytta olur
+        self.assertEqual(len(site.cerceveler(bytes(yanlis_yer))), 1)
+
+    def test_gecersiz_basliklar_atlanir(self):
+        gecerli = _cerceve(3, 9, 0)
+        for bozuk in (_cerceve(3, 9, 0, katman=2), bytes([0xFF, 0xEB]) + gecerli[2:],  # Katman II; ayrılmış sürüm
+                      bytes([0xFF, 0xFB, 0x00]) + gecerli[3:], bytes([0xFF, 0xFB, 0xF0]) + gecerli[3:],  # bit 0 / 15
+                      bytes([0xFF, 0xFB, 0x9C]) + gecerli[3:], bytes([0xFE]) + gecerli[1:]):  # ayrılmış hz; senkron yok
+            with self.subTest(bozuk=bozuk[:3].hex()):
+                self.assertEqual(site.cerceveler(bozuk), [], "bozuk başlık çerçeve sayılmaz")
+                self.assertIn(len(bozuk), [c.bas for c in site.cerceveler(bozuk + gecerli)], "arkasındaki bulunur")
+
+    def test_id3_etiketleri_atlanir(self):
+        gecerli = _cerceve(3, 9, 0)
+        id3v2 = b"ID3\x04\x00\x00" + bytes([0, 0, 1, 0]) + b"\xff" * 128  # eşzamanlı boy: 128
+        altbilgili = b"ID3\x04\x00\x10" + bytes([0, 0, 0, 5]) + b"\xff" * 5 + b"3DI" + b"\x00" * 7
+        id3v1 = b"TAG" + b"\xff" * 125
+        for on in (id3v2, altbilgili):
+            self.assertEqual([c.bas for c in site.cerceveler(on + gecerli)], [len(on)])
+        self.assertEqual([c.bas for c in site.cerceveler(gecerli + id3v1 + gecerli)], [0, len(gecerli) + 128])
+
+
 class BolmeTesti(GeciciKokTesti):
     def test_esit_parcalar_ve_sure_korunur(self):
         veri = _mp3(30.0)
