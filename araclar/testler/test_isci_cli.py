@@ -201,5 +201,79 @@ class DurumCiktisiTesti(CliTabani):
         self.assertIn("0 kota harcayan istek, 0 ses geldi, 0 boşa gitti\n", cikti)
 
 
+class KomutTesti(CliTabani):
+    """Ağır işleri çağıran komutlar: doğru argümanla çağırır, sonucu doğru yazar, doğru çıkış kodunu döner."""
+
+    def test_oku_eser_is_tanimini_kurar_cikis_kodunu_doner(self):
+        from unittest import mock
+        gelen = []
+        with mock.patch.object(cli, "oku_eser", lambda is_, y: (gelen.append((is_, y)), Cikis.KOTA)[1]):
+            kod, _ = self.calistir("oku-eser", "kisa-oyku", "--arac-adi", "A", "--model", "m", "--ses", "Fola",
+                                   "--ortak", "m2,,m3", "--hedef-sn", "900")
+        self.assertEqual(kod, int(Cikis.KOTA))
+        ((is_, y),) = gelen
+        self.assertIs(y, self.y)
+        self.assertEqual(is_, IsTanimi(ad="kisa-oyku", arac_adi="A", model="m", ses="Fola", ortak=("m2", "m3"),
+                                       hedef_sn=900, sabit_blok=None))
+        with mock.patch.object(cli, "oku_eser", lambda is_, y: (gelen.append((is_, y)), Cikis.TAMAM)[1]):
+            self.calistir("oku-eser", "x", "--arac-adi", "A", "--model", "m", "--ses", "S", "--sabit-blok", "2000")
+        self.assertEqual((gelen[-1][0].ortak, gelen[-1][0].sabit_blok, gelen[-1][0].hedef_sn), ((), 2000, None))
+
+    def test_kontrol_ozeti_yazar_gecmezse_1(self):
+        from unittest import mock
+        from sesli.kontrol import BlokRaporu, KontrolSonucu
+        for sonuc, kod_b in ((KontrolSonucu(99.0, [BlokRaporu(1, 0.99, 1.0, "m", "d", [])]), 0),
+                             (KontrolSonucu(90.0, [BlokRaporu(1, 0.8, 1.0, "m", "d", ["a b c"])]), 1)):
+            with mock.patch.object(cli, "kontrol_et", lambda f, p, s=sonuc: s):
+                kod, cikti = self.calistir("kontrol", "kisa-oyku")
+            self.assertEqual(kod, kod_b)
+            self.assertTrue(cikti.startswith("PARAGRAF 1 | harf düzeyinde eşleşme"), cikti)
+            self.assertNotIn("[1/1]", cikti, "blok blok satırlar değil, özet")
+        with mock.patch.object(cli, "kontrol_et", lambda f, p: KontrolSonucu(0.0, [])):
+            self.assertEqual(self.calistir("kontrol", "kisa-oyku"), (1, "blok yok\n"))
+
+    def test_site_kuru_calisma_ozet_yazar(self):
+        from unittest import mock
+        with mock.patch.object(cli.site, "hazirla", lambda y, kuru: ([{"id": 1}, {"id": 2}],
+                                                                    {"yakinda": [{"id": "a"}, {"id": "b"}]})):
+            self.assertEqual(self.calistir("site", "--kuru"), (0, "2 eser yayında olurdu; Yakında: a, b\n"))
+        with mock.patch.object(cli.site, "hazirla", lambda y, kuru: ([], {"yakinda": []})):
+            self.assertEqual(self.calistir("site", "--kuru"), (0, "0 eser yayında olurdu; Yakında: boş\n"))
+            self.assertEqual(self.calistir("site"), (0, ""))
+
+    def test_ceviri_paragraf_kelime_ve_okunussuz_adlar(self):
+        from unittest import mock
+        self.metin_yaz("kisa-oyku", ["Metin."])
+        with mock.patch.object(cli.ceviri, "yaz", lambda ad, y: (12, 3456)), \
+             mock.patch.object(cli.ceviri, "okunussuz_adlar", lambda m: [f"Ad{i}" for i in range(70)]):
+            kod, cikti = self.calistir("ceviri", "kisa-oyku")
+        self.assertEqual(kod, 0)
+        self.assertIn("paragraf: 12 | kelime: 3,456\n", cikti)
+        self.assertIn("okunuşu yazılmamış olabilecek adlar: Ad0, Ad1", cikti)
+        self.assertIn("Ad59\n", cikti)
+        self.assertNotIn("Ad60", cikti, "en çok 60 ad")
+        with mock.patch.object(cli.ceviri, "yaz", lambda ad, y: (1, 1)), \
+             mock.patch.object(cli.ceviri, "okunussuz_adlar", lambda m: []):
+            self.assertEqual(self.calistir("ceviri", "kisa-oyku"), (0, "paragraf: 1 | kelime: 1\n"))
+
+    def test_oku_zamanlayiciyi_kotalarla_kurar_ikinci_kopyada_1(self):
+        from unittest import mock
+        from sesli.kilit import tek_kopya
+        kurulan = []
+
+        class Z:
+            def calis(self):
+                kurulan.append("çalıştı")
+        with mock.patch.object(cli, "kur", lambda y, k: (kurulan.append(k), Z())[1]):
+            self.assertEqual(self.calistir("oku", "--k31", "0"), (0, ""))
+            self.assertEqual(kurulan, [{"gemini-3.8-flash-lite-tts": 10, "gemini-3.8-flash-tts": 10,
+                                        "gemini-3.1-flash-tts-preview": 0}, "çalıştı"])
+            self.y.tmp.mkdir(exist_ok=True)
+            with tek_kopya(self.y.zamanlayici_kilidi):
+                kod, cikti = self.calistir("oku")
+        self.assertEqual(kod, 1)
+        self.assertIn("okuma programı zaten çalışıyor; ikinci kopya başlatılmadı", cikti)
+
+
 if __name__ == "__main__":
     unittest.main()
