@@ -168,6 +168,41 @@ class EksikFazlaSinirTesti(unittest.TestCase):
         self.assertEqual(ayri, [[1, 1], [3, 3]])
 
 
+class BolgeVeKesimTesti(unittest.TestCase):
+    def ayir(self, cumle, sozler):
+        from sesli.yama import _Dinleme, _eksik_ve_fazla, _eslestir, _kelimeler, _kesimler
+        hedef, hangi = _kelimeler(cumle)
+        duy = [(w, i * 1.0, i * 1.0 + 0.8) for i, w in enumerate(sozler)]
+        d = _Dinleme(duy, len(duy) * 1.0)
+        es = _eslestir(hedef, duy)
+        bolgeler, atilacak = _eksik_ve_fazla(es, hedef, hangi, d)
+        return bolgeler, _kesimler([list(b) for b in bolgeler], hangi, es[1], d, cumle)
+
+    def test_iki_ayri_atlama_yan_yanaysa_birlesir(self):
+        cumle = ["Bir iki üç.", "Dört beş altı.", "Yedi sekiz dokuz onlar.", "Son söz burada."]
+        bolgeler, kesim = self.ayir(cumle, ["bir", "iki", "üç", "yedi", "son", "söz", "burada"])
+        self.assertEqual(bolgeler, [[1, 2]], "Dört beş altı + sekiz dokuz onlar")
+        (k,) = kesim
+        # arada duyulmuş "yedi" de kesilir: cümle yamada baştan okunacak, iki kez duyulmasın
+        self.assertEqual((k.t0, k.t1, k.yazi), (2.9, 3.9, "Dört beş altı. Yedi sekiz dokuz onlar."))
+
+    def test_baska_soz_okunan_yer_de_atlamadir(self):
+        cumle = ["Bir iki üç.", "Dört beş altı yedi sekiz.", "Son söz burada."]
+        bolgeler, _ = self.ayir(cumle, ["bir", "iki", "üç", "zzz", "son", "söz", "burada"])
+        self.assertEqual(bolgeler, [[1, 1]])
+
+    def test_bastaki_ve_sondaki_atlamanin_kesimi(self):
+        cumle = ["Dört beş altı.", "Bir iki üç.", "Yedi sekiz dokuz."]
+        _, kesim = self.ayir(cumle, ["bir", "iki", "üç"])
+        self.assertEqual([(k.t0, k.t1, k.yazi) for k in kesim],
+                         [(0.0, 0.0, "Dört beş altı."), (3.0, 3.0, "Yedi sekiz dokuz.")])  # baştan ve sona eklenir
+
+    def test_cevresi_karisik_bolge_onarilmaz(self):
+        from sesli.yama import _Dinleme, _kesimler
+        duy = [("a", 0.0, 0.5), ("b", 1.0, 1.5)]
+        self.assertIsNone(_kesimler([[1, 1]], [0, 1, 2], {0: 1, 2: 0}, _Dinleme(duy, 2.0), ["A.", "B.", "C."]))
+
+
 class YamaOkumaTesti(unittest.TestCase):
     """_yamayi_oku: birden çok atlanan yer tek istekte okunur, ses yerlerine göre doğru noktadan bölünür."""
 
