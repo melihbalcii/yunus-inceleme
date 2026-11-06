@@ -154,6 +154,32 @@ class CliTesti(CliTabani):
             cli.main(["yok"], yollar=self.y)
 
 
+class TeslimKomutuTesti(CliTabani):
+    def test_butun_eserler_konulan_yazilir_guncel_ve_kayitsiz_sessiz(self):
+        from unittest import mock
+        from types import SimpleNamespace as N
+        from sesli.teslim import TeslimDurumu as TD
+        sonuclar = {"kisa-oyku": N(durum=TD.KONULDU, hedef=self.y.teslim / "Gemini 3.8 Flash" / "01 - a.mp3",
+                                    eslesme=98.256, cope=(self.y.cop / "eski.mp3",)),
+                    "uzun-roman": N(durum=TD.GUNCEL, hedef=None, eslesme=None, cope=()),
+                    "emel-eseri": N(durum=TD.KAYIT_YOK, hedef=None, eslesme=None, cope=())}
+        with mock.patch.object(cli, "teslim_et", lambda e, y: sonuclar[e.ad]):
+            self.assertEqual(self.calistir("teslim"), (0, "konuldu: Gemini 3.8 Flash/01 - a.mp3 (eşleşme %98.26)\n"
+                                                         "eski hâli Çöp Sepeti'ne kondu: eski.mp3\n"))
+            sonuclar["uzun-roman"] = N(durum=TD.KONTROLDEN_GECMEDI, hedef=None, eslesme=90.0, cope=())
+            kod, cikti = self.calistir("teslim")
+        self.assertEqual(kod, 1)
+        self.assertIn(f"02 - Uzun Roman - Yazar İki.mp3: {TD.KONTROLDEN_GECMEDI.value}", cikti)
+
+    def test_tek_eserde_guncel_bildirilir_hata_sayilmaz(self):
+        from unittest import mock
+        from types import SimpleNamespace as N
+        from sesli.teslim import TeslimDurumu as TD
+        with mock.patch.object(cli, "teslim_et", lambda e, y: N(durum=TD.GUNCEL, hedef=None, eslesme=None, cope=())):
+            kod, cikti = self.calistir("teslim", "kisa-oyku")
+        self.assertEqual((kod, cikti), (0, f"01 - Kısa Öykü - Yazar Bir.mp3: {TD.GUNCEL.value}\n"))
+
+
 class AyristiriciTesti(unittest.TestCase):
     def ayir(self, *arg: str):
         return cli.ayristirici().parse_args(list(arg))

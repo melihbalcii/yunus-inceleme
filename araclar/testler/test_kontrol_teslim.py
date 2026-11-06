@@ -358,6 +358,27 @@ class CopeTasimaTesti(GeciciKokTesti):
         self.assertEqual(sorted(p.read_bytes() for p in self.y.cop.iterdir()), [b"bir", b"iki", b"uc"])
 
 
+class BirlesikParagrafAyrintiTesti(BirlesikParagrafTesti):
+    test_boylar_giris_ve_kapanislar_tek_kez_kalir = None  # type: ignore[assignment]
+    test_kapanissiz_boy_hata = None  # type: ignore[assignment]
+    test_bolumlerde_sira_basligi_bir_kez_kalir = None  # type: ignore[assignment]
+    test_gecis_duyurusu_olmayan_parca_hata = None  # type: ignore[assignment]
+
+    def test_tek_parcali_eser(self):
+        self.assertEqual(self.parcalar("kisim", ["Eser. Birinci kısım.", "A.", "Eseri dinlediniz."]),
+                         ["Eser.", "A.", "Eseri dinlediniz."])
+
+    def test_boy_girisinde_yalniz_ilk_nokta_ayrilir(self):
+        sonuc = self.parcalar("boy", ["Dede Korkut. Birinci boy: Dirse. Han.", "A.", "Birinci boyunu dinlediniz."],
+                              ["Dede Korkut. İkinci boy: Bamsı. Beyrek.", "B.", "Dede Korkut'un ikinci boyunu dinlediniz."])
+        self.assertEqual(sonuc[2], "İkinci boy: Bamsı. Beyrek.")
+
+    def test_tek_paragrafli_bolumde_baslik_silinmez(self):
+        sonuc = self.parcalar("bolum", ["Eser. Birinci bölüm.", "Birinci bölümün sonu."], ["Eser. İkinci bölüm.",
+                                                                                        "Son bölüm."])
+        self.assertEqual(sonuc, ["Eser.", "Son bölüm."], "başlığa benzeyen tek paragraf silinmez")
+
+
 class KontrolSonucuTesti(GeciciKokTesti):
     """Teslimin son kapısı: eşikler sınır değerlerde doğru, kayıt okunup yazılınca aynı kalır."""
 

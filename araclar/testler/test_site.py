@@ -328,6 +328,14 @@ class SiteDosyalariTesti(YayinTabani):
         self.assertTrue(any((self.y.yayin / "ses").iterdir()), "ses parçaları yerinde kalır")
 
 
+class PlansizEserTesti(YayinTabani):
+    def test_planda_satiri_olmayan_eserin_koken_ve_ulkesi_bos(self):
+        self.kur()
+        self.y.plan_csv.write_text("No,Köken,Ülke\n7,Rus,Rusya\n", encoding="utf-8")
+        (k,) = site.hazirla(self.y, bildir=lambda s: None)[0]
+        self.assertEqual((k["koken"], k["ulke"]), ("", ""))
+
+
 class OzetOnbellegiTesti(GeciciKokTesti):
     def test_ozet_dosya_degismedikce_yeniden_okunmaz_degisince_degisir(self):
         mp3, kayit = self.kok / "a.mp3", self.kok / "ozetler.json"
