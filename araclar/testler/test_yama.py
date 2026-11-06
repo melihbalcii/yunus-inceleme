@@ -145,6 +145,29 @@ class YamaParcalariTesti(unittest.TestCase):
         self.assertIsNone(_birlestir(ses, [_Kesim(0.5, 1.5), _Kesim(1.0, 2.0)]), "çakışan kesimler")
 
 
+class EksikFazlaSinirTesti(unittest.TestCase):
+    def ayir(self, cumle, sozler):
+        from sesli.yama import _Dinleme, _eksik_ve_fazla, _eslestir, _kelimeler
+        hedef, hangi = _kelimeler(cumle)
+        duy = [(w, i * 1.0, i * 1.0 + 0.8) for i, w in enumerate(sozler)]
+        return _eksik_ve_fazla(_eslestir(hedef, duy), hedef, hangi, _Dinleme(duy, len(duy) * 1.0))
+
+    def test_fazla_okuma_hem_4_kelime_hem_15_harf_olmali(self):
+        cumle = ["Bir iki üç dört."]
+        for ek, kesilir in ((["aa", "bb", "cc", "dd"], False), (["uzunsöz", "uzunsöz", "uzunsöz"], False),
+                            (["aaaa", "bbbb", "cccc", "ddd"], True)):
+            with self.subTest(ek=ek):
+                _, atilacak = self.ayir(cumle, ["bir", "iki", *ek, "üç", "dört"])
+                self.assertEqual(bool(atilacak), kesilir)
+
+    def test_atlanan_bolgeler_bitisikse_birlesir_degilse_ayri(self):
+        cumle = ["Bir iki üç.", "Dört beş altı.", "Yedi sekiz dokuz.", "On on bir on iki.", "Son cümle burada."]
+        bitisik, _ = self.ayir(cumle, ["bir", "iki", "üç", "son", "cümle", "burada"])
+        self.assertEqual(bitisik, [[1, 3]])
+        ayri, _ = self.ayir(cumle, ["bir", "iki", "üç", "yedi", "sekiz", "dokuz", "son", "cümle", "burada"])
+        self.assertEqual(ayri, [[1, 1], [3, 3]])
+
+
 class YamaOkumaTesti(unittest.TestCase):
     """_yamayi_oku: birden çok atlanan yer tek istekte okunur, ses yerlerine göre doğru noktadan bölünür."""
 
