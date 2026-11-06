@@ -153,7 +153,7 @@ if adim on-yuz; then
   cp -R public/. "$olcum_kok/"
   cp olcum/ornek-katalog.json "$olcum_kok/katalog.json"
   cp olcum/ornek-yakinda.json "$olcum_kok/yakinda.json"
-  (cd "$olcum_kok" && "$PY" -m http.server 8765 >/dev/null 2>&1) &
+  (cd "$olcum_kok" && exec "$PY" -m http.server 8765 >/dev/null 2>&1) &  # exec: kill sunucunun kendisini kapatır
   sunucu=$!
   sleep 2
   rm -rf "$S/lighthouse" .lighthouseci
