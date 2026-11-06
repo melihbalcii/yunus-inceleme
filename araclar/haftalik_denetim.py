@@ -2,7 +2,7 @@
 
 Testler ancak düşünülen durumu sınar; bu betik gerçekte ne olduğuna bakar (kalite/HATA-DEFTERI.md H-001: kanıt
 günlükte vardı, bakılmadı). Her çalıştırmada yalnız son denetimden bu yana eklenen satırlara bakar; konumu
-.tmp/denetim-durumu.json'da tutar. Rapor notlar/denetim/<tarih>.md'ye yazılır. Alarm varsa çıkış kodu 1.
+.tmp/denetim-durumu.json'da tutar. Rapor notlar/denetim/<tarih>.md'ye eklenir (aynı gün üzerine yazılmaz). Alarm varsa çıkış kodu 1.
 
 Kullanım:  .venv-ses/bin/python araclar/haftalik_denetim.py [--bastan]
   --bastan  kayıtlı konumu yok sayıp bütün günlüğü baştan denetler (geçmişe dönük tarama)
@@ -29,6 +29,7 @@ ORTAM = (".venv-ses", ".cache/python", ".cache/huggingface", "araclar")
 SF_DATALESS = 0x40000000  # macOS: içeriği Mac'te olmayan, yalnız iCloud'da duran dosya (sys/stat.h)
 
 BOSA_ORAN_SINIRI = 0.15   # kota harcayan isteklerin bundan fazlası ses getirmediyse alarm
+EN_COK_DENEME = 3         # bir blok kalite yüzünden en çok bu kadar okunur (sesli/okuma.py DENEME); fazlası tekrar işidir
 ZAMAN = re.compile(r"^(\d{2}\.\d{2} \d{2}:\d{2}) ")
 TEKRAR = ("bağlantı koptu ya da zaman aşımı", "sunucu hatası, tekrar", "yanıt kayboldu", "yanıt gecikiyor")
 YARIM_DENEME = ("(deneme ", "ATLAMA", "SES BOZULUYOR")   # bloğun henüz diske yazılmamış okuması
@@ -107,12 +108,14 @@ def defteri_denetle(satirlar: list[str]) -> list[Bulgu]:
     bosa = harcayan - sonuc.get("ses", 0)
     oran = bosa / harcayan if harcayan else 0.0
 
-    # aynı metin (özet) birden fazla kez ses getirdiyse aynı iş iki kez yaptırılmış olabilir
+    # aynı metin (özet) birden çok kez ses getirdiyse: kalite yüzünden yeniden okuma (en çok EN_COK_DENEME) olağandır,
+    # fazlası aynı işin yeniden yaptırılmasıdır
     sesler: dict[str, int] = {}
     for k in kayitlar:
         if k.get("sonuc") == "ses":
             sesler[k["ozet"]] = sesler.get(k["ozet"], 0) + 1
-    tekrar = [f"{o}: {n} kez" for o, n in sesler.items() if n > 1]
+    tekrar = [f"{o}: {n} kez" for o, n in sesler.items() if n > EN_COK_DENEME]
+    yeniden = [f"{o}: {n} kez" for o, n in sesler.items() if 1 < n <= EN_COK_DENEME]
 
     # süreleri çakışan istekler: aynı anda birden fazla istek
     araliklar = sorted((z, z + dt.timedelta(seconds=float(k.get("sn", 0)))) for k in kayitlar if (z := _zaman(k)))
@@ -120,14 +123,21 @@ def defteri_denetle(satirlar: list[str]) -> list[Bulgu]:
     return [
         Bulgu(oran > BOSA_ORAN_SINIRI, f"Boşa giden istek: {bosa}/{harcayan} (%{100 * oran:.0f}); "
               f"ayrıntı: {', '.join(f'{k} {v}' for k, v in sorted(sonuc.items()))}"),
-        Bulgu(bool(tekrar), f"Aynı metin birden çok kez seslendirildi: {len(tekrar)}", tekrar),
+        Bulgu(bool(tekrar), f"Aynı metin {EN_COK_DENEME} kereden fazla seslendirildi: {len(tekrar)}", tekrar),
+        Bulgu(False, f"Kalite yüzünden yeniden okunan blok (en çok {EN_COK_DENEME} deneme, olağan): {len(yeniden)}",
+              yeniden),
         Bulgu(bool(cakisma), f"Aynı anda birden çok istek: {len(cakisma)}", cakisma),
     ]
 
 
-def surecleri_denetle() -> list[Bulgu]:
-    r = subprocess.run(["pgrep", "-fl", "sesli_kitap.py oku"], capture_output=True, text=True, check=False)
-    zamanlayici = [s for s in r.stdout.splitlines() if "oku-eser" not in s and s.strip()]
+def surecleri_denetle(cikti: str | None = None) -> list[Bulgu]:
+    """Aynı anda birden çok okuma programı (zamanlayıcı) çalışıyor mu? `cikti`: `pgrep -fl` çıktısı (testler için)."""
+    if cikti is None:
+        cikti = subprocess.run(["pgrep", "-fl", "sesli_kitap.py oku"], capture_output=True, text=True,
+                               check=False).stdout
+    # alt süreç (oku-eser) ve programı uyutmayan sarmalayıcı (caffeinate) ikinci kopya değildir
+    zamanlayici = [s for s in cikti.splitlines()
+                   if len(s.split()) > 1 and "oku-eser" not in s and s.split()[1] != "caffeinate"]
     return [Bulgu(len(zamanlayici) > 1, f"Çalışan okuma programı kopyası: {len(zamanlayici)}", zamanlayici)]
 
 
@@ -176,7 +186,8 @@ def main(argv: list[str] | None = None) -> int:
         yazi += [f"  - {x}" for x in b.ayrinti[:15]] + ([f"  - … {len(b.ayrinti) - 15} tane daha"] if len(b.ayrinti) > 15 else [])
     RAPOR.mkdir(parents=True, exist_ok=True)
     rapor = RAPOR / f"{simdi:%Y-%m-%d}.md"
-    rapor.write_text("\n".join(yazi) + "\n", encoding="utf-8")
+    with open(rapor, "a", encoding="utf-8") as f:  # gün içinde birden çok denetim: öncekinin bulguları kalır
+        f.write(("\n---\n\n" if f.tell() else "") + "\n".join(yazi) + "\n")
     DURUM.write_text(json.dumps({"gunluk": g_konum, "defter": d_konum, "son": f"{simdi:%Y-%m-%d %H:%M}"}))
     print("\n".join(yazi))
     print(f"\nRapor: {rapor}")

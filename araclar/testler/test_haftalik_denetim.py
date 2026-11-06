@@ -46,5 +46,30 @@ class OrtamDenetimiTesti(unittest.TestCase):
         self.assertFalse(b.alarm)
 
 
+class SurecVeTekrarTesti(unittest.TestCase):
+    def test_caffeinate_ve_alt_surec_ikinci_kopya_sayilmaz(self):
+        cikti = ("46707 .venv-ses/bin/python -u araclar/sesli_kitap.py oku\n"
+                 "46709 caffeinate -is .venv-ses/bin/python -u araclar/sesli_kitap.py oku\n"
+                 "46800 /k/.venv-ses/bin/python -u /k/araclar/sesli_kitap.py oku-eser x --model m\n")
+        (b,) = H.surecleri_denetle(cikti)
+        self.assertFalse(b.alarm)
+        self.assertEqual(b.baslik, "Çalışan okuma programı kopyası: 1")
+
+    def test_iki_zamanlayici_alarm(self):
+        cikti = "1 python -u araclar/sesli_kitap.py oku\n2 python -u araclar/sesli_kitap.py oku\n"
+        self.assertTrue(H.surecleri_denetle(cikti)[0].alarm)
+
+    def test_kalite_icin_yeniden_okuma_olagan_fazlasi_alarm(self):
+        import json
+        def kayit(ozet, n):
+            return [json.dumps({"zaman": "2026-11-06T03:30:00+0300", "ozet": ozet, "sonuc": "ses", "sn": 50})] * n
+        bulgular = {b.baslik.split(":")[0]: b for b in H.defteri_denetle(kayit("a", 3) + kayit("b", 2) + kayit("c", 1))}
+        self.assertFalse(bulgular[f"Aynı metin {H.EN_COK_DENEME} kereden fazla seslendirildi"].alarm)
+        yeniden = bulgular[f"Kalite yüzünden yeniden okunan blok (en çok {H.EN_COK_DENEME} deneme, olağan)"]
+        self.assertEqual(yeniden.ayrinti, ["a: 3 kez", "b: 2 kez"])
+        fazla = {b.baslik.split(":")[0]: b for b in H.defteri_denetle(kayit("a", 4))}
+        self.assertTrue(fazla[f"Aynı metin {H.EN_COK_DENEME} kereden fazla seslendirildi"].alarm)
+
+
 if __name__ == "__main__":
     unittest.main()
