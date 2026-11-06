@@ -44,7 +44,7 @@ jobs:
     needs: scorecard
     if: always()   # Scorecard düşse de öbür ölçümler çalışır
     runs-on: macos-latest   # üretim ortamı Apple Silicon Mac
-    timeout-minutes: 300
+    timeout-minutes: 180   # takılan ölçüm sırayı saatlerce kilitlemesin (6 Kasım: 1,5 saatte takılan ölçüm iptal edilemedi)
     permissions:
       contents: read
       security-events: write   # CodeQL sonuçları Security sekmesine
