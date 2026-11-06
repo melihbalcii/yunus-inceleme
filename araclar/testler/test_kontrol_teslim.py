@@ -187,6 +187,40 @@ class BirlesikParagrafTesti(GeciciKokTesti):
             self.parcalar("kisim", ["Eser. Birinci kısım.", "A.", "Burada duyuru yok."], ["Eser. İkinci kısım.", "B."])
 
 
+class KuyrukHazirlikTesti(GeciciKokTesti):
+    """Kuyruk ve okuma metni: önizleme diske yazmaz; zamanlayıcı metni günceller; eşit uzunlukta ad sırası."""
+
+    def test_onizleme_yazmaz_uzunlugu_kaynaktan_olcer(self):
+        self.metin_yaz("kisa-oyku", ["abc"])
+        self.metin_yaz("uzun-roman", ["abcdef"])
+        isler = kuyruk(Katalog.yukle(self.y), self.y)
+        self.assertEqual([(i.ad, i.uzunluk) for i in isler], [("kisa-oyku", 4), ("uzun-roman", 7)])
+        self.assertFalse(self.y.fola_klasoru("kisa-oyku").exists(), "önizleme dosya yazmamalı")
+
+    def test_hazir_okuma_metni_varsa_uzunluk_ondan(self):
+        self.metin_yaz("kisa-oyku", ["abc"])
+        f = self.y.fola_klasoru("kisa-oyku")
+        f.mkdir(parents=True)
+        (f / "seslendirme-metni.txt").write_text("x" * 50, encoding="utf-8")
+        (i,) = [i for i in kuyruk(Katalog.yukle(self.y), self.y) if i.ad == "kisa-oyku"]
+        self.assertEqual((i.uzunluk, i.metin_dosyasi), (50, f / "seslendirme-metni.txt"))
+
+    def test_zamanlayici_metni_kaynaga_gore_gunceller_yarim_dosya_birakmaz(self):
+        self.metin_yaz("kisa-oyku", ["abc"])
+        f = self.y.fola_klasoru("kisa-oyku")
+        f.mkdir(parents=True)
+        (f / "seslendirme-metni.txt").write_text("eski", encoding="utf-8")
+        (i,) = [i for i in kuyruk(Katalog.yukle(self.y), self.y, hazirla=True) if i.ad == "kisa-oyku"]
+        self.assertEqual((f / "seslendirme-metni.txt").read_text(encoding="utf-8"), "abc\n")
+        self.assertEqual(i.uzunluk, 4)
+        self.assertEqual([p.name for p in f.iterdir()], ["seslendirme-metni.txt"])
+
+    def test_esit_uzunlukta_ad_sirasi(self):
+        self.metin_yaz("uzun-roman", ["abc"])
+        self.metin_yaz("kisa-oyku", ["xyz"])
+        self.assertEqual([i.ad for i in kuyruk(Katalog.yukle(self.y), self.y)], ["kisa-oyku", "uzun-roman"])
+
+
 class CopeTasimaTesti(GeciciKokTesti):
     """Hiçbir şey silinmez: eski teslim kopyası Çöp Sepeti'ne gider, oradaki aynı adlı dosyanın üzerine yazılmaz."""
 
