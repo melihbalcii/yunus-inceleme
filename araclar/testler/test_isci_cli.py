@@ -358,5 +358,27 @@ class OkunussuzAdTesti(unittest.TestCase):
         self.assertEqual(okunussuz_adlar("Ali Veli Ayşe Mehmet."), [])
 
 
+class DurumSatirTesti(CliTabani):
+    def test_satirlarin_tam_bicimi(self):
+        self.metin_yaz("kisa-oyku", ["kısa"])
+        self.metin_yaz("uzun-roman", ["uzun"])
+        self.y.durum.write_text(json.dumps({"atama": {"kisa-oyku": "m1"}, "ortak": {"kisa-oyku": ["m2", "m3"]}}))
+        teslim = self.y.teslim / "Gemini 3.8 Flash"
+        teslim.mkdir()
+        (teslim / "02 - Uzun Roman - Yazar İki.mp3").write_bytes(b"x")
+        fola = self.y.fola_klasoru("uzun-roman")
+        fola.mkdir(parents=True, exist_ok=True)
+        (fola / "kontrol.json").write_text(json.dumps({"eslesme": 99.1, "bloklar": []}))
+        fola = self.y.fola_klasoru("kisa-oyku")
+        fola.mkdir(parents=True, exist_ok=True)
+        (fola / "kontrol.json").write_text(json.dumps({"eslesme": 99.1, "bloklar": []}))
+        _, cikti = self.calistir("durum")
+        satirlar = cikti.splitlines()
+        self.assertEqual(satirlar[0], " No  Eser                                       Durum")
+        self.assertIn(f"  1  {'Kısa Öykü':<42} okunuyor: m1 + m2, m3; kontrol %99.10 geçti", satirlar)
+        self.assertIn(f"  2  {'Uzun Roman':<42} teslim edildi (Gemini 3.8 Flash)", satirlar, "teslimde kontrol yazılmaz")
+        self.assertIn("Kuyruk (kısadan uzuna): kisa-oyku (5 kr)", cikti)
+
+
 if __name__ == "__main__":
     unittest.main()
