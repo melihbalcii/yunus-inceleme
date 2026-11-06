@@ -297,7 +297,7 @@ class KunyeTesti(GeciciKokTesti):
         self.assertEqual({a: str(k[a]) for a in alanlar},
                          {"TIT2": "Kısa Öykü", "TPE1": "Yazar Bir", "TALB": "Sesli Klasikler", "TCON": "Sesli Kitap",
                           "TLAN": "tur", "TDRC": "2026"})
-        self.assertTrue(all(k[a].encoding == 3 for a in alanlar), "UTF-8")
+        self.assertTrue(all(k[a].encoding == 3 for a in alanlar[:5]), "Türkçe harfli alanlar UTF-8 (yıl yalnız rakam)")
         (yorum,) = k.getall("COMM")
         self.assertEqual((yorum.lang, yorum.desc, yorum.encoding), ("tur", "", 3))
         self.assertEqual(str(yorum), "Bu kayıt yapay zekâ sesiyle (Gemini 3.8 Flash TTS, Fola) seslendirilmiştir.")
