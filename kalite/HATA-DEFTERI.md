@@ -165,3 +165,10 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
 - **Canlı doğrulama (aynı gece):** Gemini 503 "yoğunluk" yanıtlarında (1-2 sn'de dönen ret) kod en çok 2 deneyip 10 dk
   bekledi; blok başına günlük tavan (4) dolunca 03:26'da 5. isteği hiç atmadı; Flash'ı dinlenmeye aldı; yeni kodla
   başlayınca canlı alarm (bugün 5 boşa istek ≥ 4) okumayı kota yenilenene dek durdurdu. **Durum:** Düzeltildi.
+
+### H-021 · Sık gönderimde GitHub ölçümü hiç bitemiyordu
+- **Bulan:** Biz (6 Kasım gecesi, 5 saat boyunca tek ölçüm sonuçlanmadı) · **Tür:** Ölçüm düzeni (S2)
+- **Kök neden:** İş akışında `cancel-in-progress: true`: her yeni gönderim çalışan ölçümü iptal ediyordu. Ölçüm ~1 saat
+  sürdüğü için sık gönderimde hiçbiri tamamlanmadı. Ayrıca takılan bir ölçüm 5 saatlik sınıra kadar sırayı kilitledi.
+- **Düzeltme:** `cancel-in-progress: false` (çalışan biter, sırada yalnız en son gönderim bekler); süre sınırı 3 saat.
+- **Durum:** Düzeltildi.

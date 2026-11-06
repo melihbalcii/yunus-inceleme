@@ -15,7 +15,7 @@ permissions:
 
 concurrency:
   group: puanlama-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false   # çalışan ölçüm biter; sırada yalnız en son gönderim bekler (H-021)
 
 jobs:
   # Scorecard bir "container" eklentisi: yalnız Linux makinede çalışır (5 Kasım'daki ilk çalıştırmada macOS'ta düştü).
