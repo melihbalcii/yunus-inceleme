@@ -27,7 +27,8 @@ class YollarTesti(unittest.TestCase):
     def test_gercek_yollar(self):
         y, ev = Yollar.varsayilan(), Path.home()
         self.assertEqual(y.kok, PROJE_KOKU)
-        self.assertEqual((PROJE_KOKU / "araclar" / "sesli" / "yollar.py").exists(), True)
+        from sesli import yollar
+        self.assertEqual(PROJE_KOKU, Path(yollar.__file__).resolve().parents[2], "kök: araclar/'ın bir üstü")
         self.assertEqual(y.teslim, ev / "Desktop" / "sesli kitap fola")
         self.assertEqual(y.emel_teslim, ev / "Desktop" / "sesli kitap")
         self.assertEqual(y.yayin, ev / "Library" / "Caches" / "melihten-dinle" / "yayin", "yayın iCloud dışında")
