@@ -85,7 +85,7 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("[data-disa]")) return disaAktar();
   if (e.target.closest("[data-hikaye]")) return hikayeAc();
   const ka = e.target.closest("[data-kart]");
-  if (ka) return kartPaylas(eserBul(ka.dataset.kart));
+  if (ka) return kartPaylas(eserBul(ka.dataset.kart)).catch(() => bildir("Kart paylaşılamadı"));
   if (e.target.closest("[data-an-paylas]")) return anPaylas();
   if (e.target.closest("[data-kur]")) return kur();
   if (e.target.closest("[data-kur-gizle]")) { durum.kurGizle = true; yaz(); return yenile(); }
@@ -116,7 +116,7 @@ document.addEventListener("click", (e) => {
     setTimeout(rozetDenetle, 600);
     if (location.hash === `#/eser/${simdiki.id}`) yenile();
   }
-  else if (islem === "kart" && simdiki) kartPaylas(simdiki);
+  else if (islem === "kart" && simdiki) kartPaylas(simdiki).catch(() => bildir("Kart paylaşılamadı"));
   else if (islem === "tam-ac") tamAc(true);
   else if (islem === "tam-kapat") tamAc(false);
   else if (islem === "hiz") {
@@ -131,7 +131,7 @@ document.addEventListener("click", (e) => {
     e.stopPropagation();
     const kalan = uykuBitis ? Math.ceil((uykuBitis - Date.now()) / 60000) : 0;
     menuAc(is, "Uyku zamanlayıcısı", UYKU.map((dk) => ({ etiket: dk ? `${dk} dakika` : "Kapalı", deger: dk,
-      secili: dk ? false : !uykuBitis })).concat(uykuBitis ? [] : []), uykuKur);
+      secili: dk ? false : !uykuBitis })), uykuKur);
     if (kalan) $(".secim-bas").textContent = `Uyku zamanlayıcısı · ${kalan} dk kaldı`;
   }
 });

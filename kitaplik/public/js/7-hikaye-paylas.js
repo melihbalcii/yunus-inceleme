@@ -157,7 +157,7 @@ async function kartPaylas(k) {
     x.fillText(`%${Math.round(o * 100)} dinlendi · ${sure(k.sure * (1 - o))} kaldı`, 540, y + 75);
   }
   kartAlti(x);
-  resimPaylas(c, `${k.id}-kart.png`, `${k.eser} (${k.yazar}) Melih'ten Dinle'de`);
+  return resimPaylas(c, `${k.id}-kart.png`, `${k.eser} (${k.yazar}) Melih'ten Dinle'de`);
 }
 async function hikayePaylas() {
   const v = hikayeVerisi(), [c, x] = tuval();
@@ -184,7 +184,7 @@ async function hikayePaylas() {
     x.fillText(`En sevdiğim yazar: ${v.enYazar[0]}`, 540, 1680);
   }
   kartAlti(x);
-  resimPaylas(c, "dinleme-hikayem.png", "Melih'ten Dinle'deki dinleme hikâyem");
+  resimPaylas(c, "dinleme-hikayem.png", "Melih'ten Dinle'deki dinleme hikâyem").catch(() => bildir("Paylaşılamadı"));
 }
 
 // ---------- anı paylaşma: arkadaşın bağlantıyı açınca eser tam o saniyeden başlar ----------

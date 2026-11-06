@@ -157,7 +157,7 @@ function seri() {  // hedefin tutturulduğu ardışık günler; bugün henüz tu
 function enUzunSeri() {
   const h = durum.hedef * 60;
   let en = 0, n = 0, onceki = null;
-  for (const g of Object.keys(durum.gunluk).filter((g) => durum.gunluk[g] >= h).sort()) {
+  for (const g of Object.keys(durum.gunluk).filter((g) => durum.gunluk[g] >= h).sort((a, b) => a.localeCompare(b))) {
     const t = Date.parse(g);
     n = onceki !== null && t - onceki < 1.5 * 864e5 ? n + 1 : 1;
     en = Math.max(en, n);

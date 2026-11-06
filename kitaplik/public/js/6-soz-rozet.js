@@ -57,7 +57,8 @@ async function sozPaylas() {
   x.fillStyle = "rgba(255,255,255,.75)"; x.font = "700 38px Figtree, sans-serif";
   x.fillText(`${k.yazar} · sesli dinle`, 540, 1725);
   kartAlti(x);
-  resimPaylas(c, `gunun-sozu-${k.id}.png`, `“${soz}” — ${k.yazar}, ${k.eser}. Melih'ten Dinle'de sesli dinle.`);
+  resimPaylas(c, `gunun-sozu-${k.id}.png`, `“${soz}” — ${k.yazar}, ${k.eser}. Melih'ten Dinle'de sesli dinle.`)
+    .catch(() => bildir("Paylaşılamadı"));
 }
 document.addEventListener("click", (e) => {
   if (e.target.closest("[data-soz-paylas]")) return sozPaylas();

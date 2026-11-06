@@ -230,3 +230,14 @@ test("olmayan eser sayfası siteyi düşürmez", async () => {
   assert.deepEqual(hatalar, []);
   await kapat();
 });
+
+test("eser kartı resim olarak paylaşılır (paylaşma desteği yoksa indirilir)", async () => {
+  const { p, hatalar, kapat } = await sayfa({});
+  const [indirme] = await Promise.all([p.waitForEvent("download"), p.evaluate(() => kartPaylas(eserBul("kisa-oyku")))]);
+  assert.equal(indirme.suggestedFilename(), "kisa-oyku-kart.png");
+  const baslik = (await readFile(await indirme.path())).subarray(0, 8);
+  assert.deepEqual([...baslik], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], "PNG");
+  await p.waitForFunction(() => document.body.textContent.includes("Kart resim olarak kaydedildi"));
+  assert.deepEqual(hatalar, []);
+  await kapat();
+});

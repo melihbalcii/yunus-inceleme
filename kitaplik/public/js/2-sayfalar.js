@@ -7,7 +7,7 @@ function anaSayfa() {
   const selam = sa < 5 ? "İyi geceler" : sa < 12 ? "Günaydın" : sa < 18 ? "İyi günler" : "İyi akşamlar";
   const son = sonDinlenenler();
   const hizli = [...son, ...katalog.filter((k) => !son.includes(k) && !durum.bitti[k.id] && k.sure < 3600)].slice(0, 6);
-  const sec = (f) => katalog.filter(f);
+  const sec = (f) => katalog.filter((k) => f(k));
   return `<div class="sayfa">
     <div class="ust-renk" style="--ust:${son[0] ? renk(son[0])[0] : "#1f5a3a"}">
       <div class="selam-satir"><h1 class="selam">${selam}</h1>${sozBalonu()}</div>

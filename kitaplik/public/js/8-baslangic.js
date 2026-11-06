@@ -47,7 +47,7 @@ fetch("/katalog.json", { cache: "no-cache" })
   .then((k) => {
     if (katalogHazir && JSON.stringify(k) === JSON.stringify(katalog)) return eskiIndirmeleriTemizle();
     katalogKur(k);
-    eskiIndirmeleriTemizle();
+    return eskiIndirmeleriTemizle();
   })
   .catch(() => {
     if (katalogHazir) return;

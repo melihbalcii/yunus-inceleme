@@ -185,7 +185,7 @@ class GeminiTTS:
 
     def _sinirda_bekle(self, h: Exception, dakikalik: int) -> None:
         """429: günlük kota bittiyse KotaDoldu; dakikalık sınırsa söylenen kadar bekler (çok tekrarlarsa GeciciHata)."""
-        if re.search(r"per ?day|PerDay", str(h), re.I):
+        if re.search(r"per ?day", str(h), re.I):  # PerDay, per day, PER DAY
             raise KotaDoldu(str(h)[:200]) from h
         if dakikalik >= DAKIKALIK_DENEME:
             raise GeciciHata("dakikalık sınır geçmedi") from h
