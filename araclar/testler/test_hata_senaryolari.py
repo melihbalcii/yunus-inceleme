@@ -288,5 +288,24 @@ class ZamanlayiciGeciciTesti(GeciciKokTesti):
         self.assertGreater(s.beklemeler[-1] - s.beklemeler[-2], Z.dt.timedelta(hours=1))
 
 
+class KilitIletisiTesti(GeciciKokTesti):
+    def test_kilit_dosyasi_tutan_sureci_yazar_ileti_onu_gosterir(self):
+        import os
+        yol = self.y.tmp / "deneme.kilit"
+        with tek_kopya(yol):
+            self.assertEqual(yol.read_text(), str(os.getpid()))
+            with self.assertRaises(ZatenCalisiyor) as h:
+                with tek_kopya(yol):
+                    pass
+        self.assertEqual(h.exception.pid, str(os.getpid()))
+        self.assertEqual(str(h.exception), f"başka bir süreç çalışıyor (süreç no {os.getpid()}; kilit: {yol})")
+        with tek_kopya(yol):  # bırakılınca yeniden alınır
+            pass
+
+    def test_numarasi_bilinmeyen_surec(self):
+        h = ZatenCalisiyor(self.kok / "k", "")
+        self.assertEqual((str(h), h.pid), (f"başka bir süreç çalışıyor (süreç no ?; kilit: {self.kok / 'k'})", ""))
+
+
 if __name__ == "__main__":
     unittest.main()
