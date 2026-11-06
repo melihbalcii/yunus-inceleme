@@ -45,6 +45,52 @@ class IsciTesti(GeciciKokTesti):
         self.assertIs(self.calistir(ValueError("beklenmeyen")), Cikis.HATA)
 
 
+class BasariliOkumaTesti(GeciciKokTesti):
+    """Alt sürecin başarılı yolu: doğru araç ve ayarla okur, MP3'ü ve teslimin dayandığı motor.json'u yazar, kontrol
+    sonucunu günlüğe yazar. Ağır ölçümler (Whisper, ses kalitesi modeli) sahte, gerisi gerçek."""
+
+    def calistir(self, kontrol):
+        from unittest import mock
+        from sesli import isci
+        from sesli.kontrol import BlokRaporu, KontrolSonucu
+        self.metin_yaz("kisa-oyku", ["Bir paragraf.", "İkinci paragraf."])
+        self.araclar, self.ayarlar = [], []
+        gercek = isci.Okuyucu
+
+        def okuyucu(tts, ayar, yollar, **k):
+            self.ayarlar.append(ayar)
+            return gercek(tts, ayar, yollar, olc=lambda m, s: (1.0, []), kalite=lambda s: (3.6, 3.5),
+                          yamala=lambda *a, **kw: None, **k)
+
+        def tts_kur(arac, y, bildir):
+            self.araclar.append(arac)
+            return SahteTTS()
+        sonuc = KontrolSonucu(kontrol[0], [BlokRaporu(1, kontrol[1], 1.0, "m", "d", kontrol[2])])
+        cikti = io.StringIO()
+        with mock.patch.object(isci, "Okuyucu", okuyucu), \
+             mock.patch.object(isci, "kontrol_et", lambda f, p, bildir: sonuc), contextlib.redirect_stdout(cikti):
+            kod = oku_eser(_is(), self.y, tts_kur=tts_kur)
+        return kod, cikti.getvalue()
+
+    def test_okur_motor_kaydini_yazar_kontrolu_bildirir(self):
+        kod, cikti = self.calistir((98.5, 0.99, []))
+        self.assertIs(kod, Cikis.TAMAM)
+        (arac,) = self.araclar
+        self.assertEqual((arac.ad, arac.model, arac.ses, arac.sabit_blok), ("Gemini 3.8 Flash TTS", "m", "Fola", None))
+        (ayar,) = self.ayarlar
+        self.assertEqual((ayar.model, ayar.ses, ayar.ortak, ayar.hedef_sn, ayar.sabit_blok, ayar.siir),
+                         ("m", "Fola", ("m2",), 600, None, False))
+        fola = self.y.fola_klasoru("kisa-oyku")
+        self.assertTrue((fola / "kisa-oyku.mp3").exists())
+        self.assertEqual(json.loads((fola / "motor.json").read_text()),
+                         {"motor": "Gemini 3.8 Flash TTS", "model": "m", "ses": "Fola"})
+        self.assertIn("kontrol: eşleşme %98.50, 0,90 altı 0, atlama 0\n", cikti)
+
+    def test_kontrolden_gecmeyen_okuma_gunlukte_belirtilir(self):
+        _, cikti = self.calistir((95.0, 0.85, ["atlanan"]))
+        self.assertIn("kontrol: eşleşme %95.00, 0,90 altı 1, atlama 1 — GEÇMEDİ\n", cikti)
+
+
 class CliTesti(GeciciKokTesti):
     def calistir(self, *arg: str) -> tuple[int, str]:
         cikti, uyari = io.StringIO(), io.StringIO()
