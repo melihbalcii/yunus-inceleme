@@ -81,5 +81,33 @@ class KaliteTesti(unittest.TestCase):
         self.assertTrue(S.kalite_bozuk(3.7, 3.6 - S.KALITE_DUSUS))
 
 
+class KirpVeMp3Testi(unittest.TestCase):
+    def test_kirp_basta_005_sonda_01_sn_pay_birakir(self):
+        sessiz = np.zeros(S.SR, dtype=np.float32)
+        dolu = np.full(S.SR // 2, 0.5, dtype=np.float32)
+        k = S.kirp(np.concatenate([sessiz, dolu, sessiz]))
+        self.assertEqual(len(k), int(S.SR * 0.05) + len(dolu) + int(S.SR * 0.1) - 1)
+        self.assertEqual(float(k[int(S.SR * 0.05)]), 0.5)
+        esik = np.concatenate([sessiz, np.full(10, S.SESSIZLIK_ESIGI, dtype=np.float32), sessiz])
+        self.assertEqual(len(S.kirp(esik)), len(esik), "eşikteki genlik sessizlik sayılır: kırpılacak ses yok")
+        self.assertIs(S.kirp(sessiz), sessiz)
+
+    def test_mp3_128kbps_tek_kanal_tepe_089_yarim_dosya_kalmaz(self):
+        import tempfile
+        from pathlib import Path
+        import soundfile as sf
+        from sesli import site
+        with tempfile.TemporaryDirectory() as d:
+            yol = Path(d) / "a.mp3"
+            S.mp3_yaz(yol, np.full(S.SR * 2, 0.2, dtype=np.float32) * np.sin(np.arange(S.SR * 2) / 5))
+            veri = yol.read_bytes()
+            self.assertEqual([p.name for p in Path(d).iterdir()], ["a.mp3"])
+            okunan, hz = sf.read(str(yol))
+        cer = site.cerceveler(veri)
+        b2, b3 = veri[cer[1].bas + 2], veri[cer[1].bas + 3]
+        self.assertEqual((site._BIT[2][b2 >> 4], b3 >> 6, hz), (128, 3, S.SR))
+        self.assertAlmostEqual(float(np.abs(okunan).max()), 0.89, delta=0.03)
+
+
 if __name__ == "__main__":
     unittest.main()
