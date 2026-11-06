@@ -217,5 +217,39 @@ class OkumaKayitlariTesti(OkuyucuTabani):
                 self.assertGreater(len(o.tts.istekler), 0, "başka araç/ses önbellekteki blokları kullanamaz")
 
 
+class EserKayitlariTesti(OkuyucuTabani):
+    def test_plan_kalite_ve_bitis_kayitlari_eksiksiz(self):
+        metin, cikti = self.eser(paragraf_sayisi=6, boy=300)
+        cikti.parent.mkdir(parents=True)
+        sure = self.okuyucu(SahteTTS(), kalite=lambda s: (3.567, 3.512)).eseri_oku(metin, cikti)
+        plan = json.loads((cikti.parent / "plan.json").read_text())
+        kalite = json.loads((cikti.parent / "kalite.json").read_text())
+        self.assertGreater(len(plan), 1)
+        self.assertEqual([p["no"] for p in plan], list(range(1, len(plan) + 1)))
+        self.assertEqual({p["tarz"] for p in plan}, {"blok"})
+        self.assertTrue(all((self.y.parcalar / p["dosya"]).exists() for p in plan))
+        self.assertEqual("\n\n".join(p["metin"] for p in plan).count("Paragraf"), 6)
+        self.assertEqual(kalite, [{"no": n, "bas": 3.57, "son": 3.51, "bozuk": False} for n in range(1, len(plan) + 1)])
+        self.assertEqual(self.mesajlar[-1], f"BITTI {cikti} süre {sure:.1f} dk")
+        toplam = sum(len(O.S.wav_oku(self.y.parcalar / p["dosya"])) for p in plan) / SR + len(plan) * O.BLOK_ARASI
+        self.assertAlmostEqual(sure, toplam / 60, places=3)
+        self.assertTrue(cikti.exists())
+        self.assertFalse(list(cikti.parent.glob("*.yaziliyor")), "yarım dosya kalmaz")
+
+    def test_bozuk_bloklar_kayitta_ve_uyarida(self):
+        metin, cikti = self.eser(paragraf_sayisi=2, boy=50)
+        cikti.parent.mkdir(parents=True)
+        self.okuyucu(SahteTTS(), kalite=lambda s: (3.5, 2.2)).eseri_oku(metin, cikti)
+        kalite = json.loads((cikti.parent / "kalite.json").read_text())
+        self.assertEqual([k["bozuk"] for k in kalite], [True] * len(kalite))
+        self.assertIn(f"SES KALİTESİ DÜŞÜK bloklar: {list(range(1, len(kalite) + 1))}", self.mesajlar)
+
+    def test_bozuk_blok_yoksa_uyari_yazilmaz(self):
+        metin, cikti = self.eser(paragraf_sayisi=2, boy=50)
+        cikti.parent.mkdir(parents=True)
+        self.okuyucu(SahteTTS()).eseri_oku(metin, cikti)
+        self.assertFalse(any("SES KALİTESİ DÜŞÜK" in m for m in self.mesajlar))
+
+
 if __name__ == "__main__":
     unittest.main()
