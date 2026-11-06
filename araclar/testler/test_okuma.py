@@ -1,6 +1,7 @@
 """Okuyucu: sahte TTS, sahte Whisper ölçümü ve sahte kalite ölçümüyle (ağ ve model yok)."""
 from __future__ import annotations
 
+import itertools
 import json
 import unittest
 
@@ -141,3 +142,75 @@ class OkuyucuTesti(GeciciKokTesti):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OkumaKayitlariTesti(OkuyucuTesti):
+    """Okumanın yan çıktıları: ölçüm kaydı (okuma hızı ve başarı oranı buradan hesaplanır), günlük satırları (kayıt
+    denetimi bunları okur) ve blok planı (ortak araç onu sürdürür; yanlış kullanılırsa bloklar baştan okunur)."""
+
+    def test_olcum_kaydi_her_blok_icin_dogru_alanlarla_yazilir(self):
+        metin, cikti = self.eser()
+        cikti.parent.mkdir(parents=True)
+        olculen: list[str] = []
+
+        def olc(m, s):
+            olculen.append(m)
+            return 0.987654, []
+        self.okuyucu(SahteTTS(), olc=olc, kalite=lambda s: (3.6123, 3.4987)).eseri_oku(metin, cikti)
+        plan = json.loads((cikti.parent / "plan.json").read_text())
+        kayitlar = [json.loads(x) for x in self.y.olcum.read_text().splitlines()]
+        self.assertEqual(olculen, [p["metin"] for p in plan], "her blok kendi metniyle ölçülmeli")
+        self.assertEqual(len(kayitlar), len(plan))
+        for k, p in zip(kayitlar, plan, strict=True):
+            sn = round(len(O.S.wav_oku(self.y.parcalar / p["dosya"])) / SR, 1)
+            self.assertEqual({x: v for x, v in k.items() if x != "zaman"},
+                             {"model": "m1", "kr": len(p["metin"]), "sn": sn, "oran": 0.9877, "iyi": True,
+                              "atlama": 0, "kalite": [3.61, 3.5]})
+
+    def test_gunluk_satirlari_kayit_denetiminin_aradigi_sozcukleri_tasir(self):
+        import haftalik_denetim as H
+        metin, cikti = self.eser(paragraf_sayisi=2)
+        cikti.parent.mkdir(parents=True)
+        sonuclar = itertools.chain([(0.90, ["atlanan söz"])], itertools.repeat((0.99, [])))
+        kaliteler = itertools.chain([(3.5, 2.0)], itertools.repeat((3.6, 3.5)))
+        self.okuyucu(SahteTTS(), olc=lambda m, s: next(sonuclar), kalite=lambda s: next(kaliteler)
+                     ).eseri_oku(metin, cikti)
+        ilk = next(m for m in self.mesajlar if "eşleşme 0.900" in m)
+        self.assertIn("ATLAMA: ['atlanan söz']", ilk)
+        self.assertIn("SES BOZULUYOR", ilk)
+        self.assertIn("(deneme 1/3)", ilk)
+        self.assertTrue(all(t in ilk for t in H.YARIM_DENEME), "kayıt denetimi yarım denemeyi tanımalı")
+        ikinci = next(m for m in self.mesajlar if "eşleşme 0.990" in m)
+        self.assertFalse(any(t in ikinci for t in H.YARIM_DENEME), "iyi okuma yarım deneme sayılmamalı")
+
+    def test_blok_planinin_kimligi_eseri_ve_araci_tanimlar(self):
+        metin, cikti = self.eser()
+        cikti.parent.mkdir(parents=True)
+        self.okuyucu(SahteTTS()).eseri_oku(metin, cikti)
+        kimlik = json.loads((cikti.parent / "blok-plan.json").read_text())["kimlik"]
+        self.assertEqual(kimlik, {"model": "m1", "ses": "Fola", "uslup": O.USLUP, "paragraf": 12,
+                                  "karakter": sum(len(f"Paragraf {i}. " + "k" * 300) for i in range(12))})
+
+    def _ikinci_arac(self, **ayar):
+        return O.Okuyucu(SahteTTS(), O.OkumaAyari(**({"model": "m2", "ses": "Fola", "hedef_sn": 60} | ayar)), self.y,
+                         bildir=lambda s: None, olc=iyi_olcum, kalite=iyi_kalite, yamala=lambda *a, **k: None)
+
+    def test_ortak_arac_planin_kimligini_degistirmez(self):
+        metin, cikti = self.eser()
+        cikti.parent.mkdir(parents=True)
+        self.okuyucu(SahteTTS()).eseri_oku(metin, cikti)
+        self._ikinci_arac(ortak=("m1",)).eseri_oku(metin, cikti)
+        self.assertEqual(json.loads((cikti.parent / "blok-plan.json").read_text())["kimlik"]["model"], "m1")
+
+    def test_ortak_olmayan_ya_da_sesi_farkli_arac_plani_yeniden_kurar(self):
+        for ayar in ({}, {"ortak": ("m1",), "ses": "Sulafat"}):
+            with self.subTest(ayar=ayar):
+                self.setUp()
+                metin, cikti = self.eser()
+                cikti.parent.mkdir(parents=True)
+                self.okuyucu(SahteTTS()).eseri_oku(metin, cikti)
+                o = self._ikinci_arac(**ayar)
+                o.eseri_oku(metin, cikti)
+                kimlik = json.loads((cikti.parent / "blok-plan.json").read_text())["kimlik"]
+                self.assertEqual((kimlik["model"], kimlik["ses"]), ("m2", ayar.get("ses", "Fola")))
+                self.assertGreater(len(o.tts.istekler), 0, "başka araç/ses önbellekteki blokları kullanamaz")
