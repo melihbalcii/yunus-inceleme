@@ -47,6 +47,53 @@ class AyarTesti(GeciciKokTesti):
         self.assertEqual(env_oku(self.kok / "olmayan"), {})
 
 
+class KatalogAyrintiTesti(GeciciKokTesti):
+    def test_varsayilanlar_ve_alanlar(self):
+        self.eser_listesi_yaz([{"ad": "a", "no": 7, "eser": "A", "yazar": "X", "durum": "etkin"},
+                               {"ad": "b", "no": 102, "eser": "B", "yazar": "Y", "durum": "tamamlanmadi",
+                                "yalniz_fola": True, "siir": True, "not": "yarım"}])
+        k = Katalog.yukle(self.y)
+        a, b = k.al("a"), k.al("b")
+        self.assertEqual((a.yalniz_fola, a.siir, a.not_, a.etkin), (False, False, "", True))
+        self.assertEqual((b.yalniz_fola, b.siir, b.not_, b.etkin), (True, True, "yarım", False))
+        self.assertEqual((a.dosya_adi, b.dosya_adi), ("07 - A - X.mp3", "102 - B - Y.mp3"))
+        self.assertEqual([e.ad for e in k], ["a", "b"])
+        self.assertIn("a", k)
+        self.assertNotIn("c", k)
+        self.assertEqual(Katalog.yukle(dosya=self.y.eserler).al("b").no, 102)
+
+    def test_ayni_ad_reddedilir(self):
+        self.eser_listesi_yaz([{"ad": "a", "no": 1, "eser": "A", "yazar": "X", "durum": "etkin"},
+                               {"ad": "a", "no": 2, "eser": "B", "yazar": "X", "durum": "etkin"}])
+        with self.assertRaisesRegex(KatalogHatasi, "aynı ad iki kez: a"):
+            Katalog.yukle(self.y)
+
+    def test_bozuk_dosya_ve_kayitlar(self):
+        for icerik in ("{bozuk", '{"baska": []}', '{"eserler": [{"ad": "a", "no": 1}]}',
+                       '{"eserler": [{"ad": "a", "no": "bir", "eser": "A", "yazar": "X", "durum": "etkin"}]}'):
+            self.y.eserler.write_text(icerik, encoding="utf-8")
+            with self.subTest(icerik=icerik), self.assertRaises(KatalogHatasi):
+                Katalog.yukle(self.y)
+        self.y.eserler.unlink()
+        with self.assertRaises(KatalogHatasi):
+            Katalog.yukle(self.y)
+
+
+class AyarAyrintiTesti(GeciciKokTesti):
+    def test_tirnak_ve_bosluk_uc_durumlari(self):
+        d = self.kok / ".env"
+        d.write_text(' A = "1" \nB="\nC="karışık\'\nexport  D=x=y\nE=\nexport=7\n', encoding="utf-8")
+        self.assertEqual(env_oku(d), {"A": "1", "B": '"', "C": '"karışık\'', "D": "x=y", "E": "", "export": "7"})
+
+    def test_hata_iletisi_gizli_degeri_icermez(self):
+        d = self.kok / ".env"
+        d.write_text("GEMINI_API_KEY=\nBASKA=cok-gizli-deger\n", encoding="utf-8")
+        with self.assertRaises(AyarHatasi) as h:
+            gerekli(d, "GEMINI_API_KEY")
+        self.assertIn("GEMINI_API_KEY yok", str(h.exception))
+        self.assertNotIn("cok-gizli-deger", str(h.exception))
+
+
 class DurumDeposuTesti(GeciciKokTesti):
     def test_bos_dosya(self):
         d = DurumDeposu(self.y.durum).oku()
