@@ -187,6 +187,24 @@ class BirlesikParagrafTesti(GeciciKokTesti):
             self.parcalar("kisim", ["Eser. Birinci kısım.", "A.", "Burada duyuru yok."], ["Eser. İkinci kısım.", "B."])
 
 
+class CopeTasimaTesti(GeciciKokTesti):
+    """Hiçbir şey silinmez: eski teslim kopyası Çöp Sepeti'ne gider, oradaki aynı adlı dosyanın üzerine yazılmaz."""
+
+    def test_ayni_adli_dosya_ezilmez_sayi_eklenir(self):
+        from sesli.teslim import cope_tasi
+        adlar = []
+        for icerik in (b"bir", b"iki", b"uc"):
+            d = self.kok / "eski.mp3"
+            d.write_bytes(icerik)
+            hedef = cope_tasi(d, "Kayıt.mp3", self.y)
+            adlar.append(hedef.name)
+            self.assertFalse(d.exists())
+            self.assertEqual(hedef.parent, self.y.cop)
+            self.assertEqual(hedef.read_bytes(), icerik)
+        self.assertEqual(adlar, ["Kayıt.mp3", "Kayıt (2).mp3", "Kayıt (3).mp3"])
+        self.assertEqual(sorted(p.read_bytes() for p in self.y.cop.iterdir()), [b"bir", b"iki", b"uc"])
+
+
 class KontrolSonucuTesti(GeciciKokTesti):
     """Teslimin son kapısı: eşikler sınır değerlerde doğru, kayıt okunup yazılınca aynı kalır."""
 
