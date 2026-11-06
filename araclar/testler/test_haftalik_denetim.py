@@ -71,5 +71,32 @@ class SurecVeTekrarTesti(unittest.TestCase):
         self.assertTrue(fazla[f"Aynı metin {H.EN_COK_DENEME} kereden fazla seslendirildi"].alarm)
 
 
+class IletiSozlesmesiTesti(unittest.TestCase):
+    """Denetim günlükteki sözcükleri arar: okuma programının bugünkü iletileri o sözcükleri taşımalı."""
+
+    def test_yeniden_deneme_iletileri_denetimce_taninir(self):
+        import httpx
+        from google.genai import errors
+        from sesli import gemini as G
+        from testler.test_gemini import SahteIstemci, _wav, _yanit
+        mesaj: list[str] = []
+        davranis = [httpx.ConnectError("x"), errors.ServerError(503, {"error": {"code": 503, "message": "x",
+                                                                                  "status": "X"}}), _yanit(_wav(0.1))]
+        G.GeminiTTS(G.Arac("A", "m", "Fola"), "a", bildir=mesaj.append, uyu=lambda s: None,
+                    istemci_kur=lambda: SahteIstemci(davranis)).uret("x")
+        self.assertEqual(len(mesaj), 2)
+        for m in mesaj:
+            self.assertTrue(any(t in m for t in H.TEKRAR), m)
+        (b,) = [x for x in H.gunlugu_denetle(mesaj) if x.baslik.startswith("Yeniden atılan")]
+        self.assertTrue(b.baslik.endswith(": 2"))
+
+    def test_kesinti_iletileri_denetimce_taninir(self):
+        from sesli import gemini as G
+        from sesli.isci import _HATA_CIKISLARI
+        for tur, _, ileti in _HATA_CIKISLARI:
+            if tur in (G.KotaDoldu, G.GeciciHata):
+                self.assertTrue(any(t in ileti for t in H.KESINTI), ileti)
+
+
 if __name__ == "__main__":
     unittest.main()

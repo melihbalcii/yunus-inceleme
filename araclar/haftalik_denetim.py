@@ -31,7 +31,9 @@ SF_DATALESS = 0x40000000  # macOS: içeriği Mac'te olmayan, yalnız iCloud'da d
 BOSA_ORAN_SINIRI = 0.15   # kota harcayan isteklerin bundan fazlası ses getirmediyse alarm
 EN_COK_DENEME = 3         # bir blok kalite yüzünden en çok bu kadar okunur (sesli/okuma.py DENEME); fazlası tekrar işidir
 ZAMAN = re.compile(r"^(\d{2}\.\d{2} \d{2}:\d{2}) ")
-TEKRAR = ("bağlantı koptu ya da zaman aşımı", "sunucu hatası, tekrar", "yanıt kayboldu", "yanıt gecikiyor")
+# yeniden atılan istek iletileri (eski koddakiler geçmiş günlükler için kalır); testler/test_haftalik_denetim.py
+# okuma programının bugünkü iletileriyle karşılaştırır
+TEKRAR = ("bağlanılamadı", "yanıt kayboldu", "yanıt gecikiyor", "bağlantı koptu ya da zaman aşımı", "sunucu hatası, tekrar")
 YARIM_DENEME = ("(deneme ", "ATLAMA", "SES BOZULUYOR")   # bloğun henüz diske yazılmamış okuması
 KESINTI = ("KOTA_DOLDU", "GEÇİCİ SORUN", "Traceback")
 
