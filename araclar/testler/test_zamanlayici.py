@@ -377,5 +377,58 @@ class GercekBagimlilikTesti(GeciciKokTesti):
             self.assertEqual(b.calistir("iş"), ("iş", self.y))
 
 
+class SonucGunluguTesti(GeciciKokTesti):
+    """Alt sürecin her sonucu doğru karara ve kayıt denetiminin okuduğu günlük satırına dönüşür."""
+    ISIM = "01 - Kısa Öykü - Yazar Bir.mp3"
+
+    def calis(self, cikislar, teslimler=(), tur=None, gunluk=(10, 0, 0)):
+        s = Sahne(self, {"kisa-oyku": 1000})
+        s.cikislar, s.teslimler = list(cikislar), list(teslimler)
+        self.basla = s.simdi
+        s.zamanlayici(gunluk=gunluk).calis(tur_siniri=tur or len(cikislar))
+        return s
+
+    def satirlar(self, s):
+        return [k for k in s.kayitlar if not k.startswith(("BAŞLADI", "bugün araçların"))]
+
+    def test_kota_doldu(self):
+        s = self.calis([Cikis.KOTA])
+        self.assertEqual(self.satirlar(s), [f"Lite TTS kotası doldu; {self.ISIM} yarın aynı araçla kaldığı yerden sürecek"])
+
+    def test_gecici_sorun_10_dk_bekler_ucuncude_arac_dinlenir(self):
+        s = self.calis([Cikis.GECICI, Cikis.GECICI, Cikis.GECICI], tur=3)
+        self.assertEqual(self.satirlar(s), [
+            f"GEÇİCİ SORUN: {self.ISIM}; 10 dk sonra yeniden denenecek",
+            f"GEÇİCİ SORUN: {self.ISIM}; 10 dk sonra yeniden denenecek",
+            f"GEÇİCİ SORUN 3 kez üst üste: Lite TTS kota yenilenene dek dinleniyor (kota boşa yanmasın); {self.ISIM} "
+            "kaldığı yerden sürecek"])
+        self.assertEqual(s.beklemeler[:2], [self.basla + dt.timedelta(minutes=10),
+                                            self.basla + dt.timedelta(minutes=20)])
+
+    def test_basarili_sonuc_gecici_sayacini_sifirlar(self):
+        s = self.calis([Cikis.GECICI, Cikis.GECICI, Cikis.KOTA, Cikis.GECICI, Cikis.GECICI], tur=5)
+        self.assertFalse(any("üst üste" in k for k in s.kayitlar), "arada başka sonuç: sayaç sıfırlanır")
+
+    def test_beklenmeyen_hata_once_bekler_ikincide_birakir(self):
+        s = self.calis([Cikis.HATA, Cikis.HATA], tur=2)
+        self.assertEqual(self.satirlar(s)[0], f"HATA: {self.ISIM}; 10 dk sonra yeniden denenecek")
+        self.assertEqual(s.beklemeler[0], self.basla + dt.timedelta(minutes=10))
+        self.assertEqual(self.satirlar(s)[1],
+                         f"BIRAKILDI {self.ISIM} — Lite TTS: 2 kez beklenmeyen hata; başka araçla baştan okunacak")
+
+    def test_guvenlik_ve_bos_yanit_eseri_aractan_birakir(self):
+        for cikis, neden in ((Cikis.GUVENLIK, "güvenlik filtresi reddetti"), (Cikis.BOLUNEMEZ, "model boş yanıt veriyor")):
+            with self.subTest(cikis=cikis):
+                self.setUp()
+                s = self.calis([cikis], tur=1)
+                self.assertEqual(self.satirlar(s),
+                                 [f"BIRAKILDI {self.ISIM} — Lite TTS: {neden}; başka araçla baştan okunacak"])
+                self.assertEqual(s.depo.oku().ret, {"lite": ["kisa-oyku"]})
+
+    def test_tamam_teslim_bitti_satiri(self):
+        s = self.calis([Cikis.TAMAM], [TeslimDurumu.GUNCEL], tur=1)
+        self.assertEqual(self.satirlar(s), [f"BİTTİ {self.ISIM} — Lite TTS (Fola)"])
+
+
 if __name__ == "__main__":
     unittest.main()
