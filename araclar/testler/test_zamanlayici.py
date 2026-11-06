@@ -493,5 +493,32 @@ class AileTesti(unittest.TestCase):
         self.assertEqual(Z.hedef_sn("gemini-3.1-flash-tts-preview", y), 470, "3.1 yalnız kendi ölçümünü kullanır")
 
 
+class IsTanimiTesti(GeciciKokTesti):
+    def test_is_tanimi_arac_ses_ortak_ve_yontem(self):
+        s = Sahne(self, {"kisa-oyku": 1000})
+        with s.depo.degistir() as d:
+            d.atama["kisa-oyku"] = "flash"
+            d.ortak["kisa-oyku"] = ["lite"]
+        s.cikislar = [Cikis.KOTA]
+        s.zamanlayici(gunluk=(10, 0, 0)).calis(tur_siniri=1)
+        (is_,) = s.isler
+        self.assertEqual((is_.ad, is_.arac_adi, is_.model, is_.ses, is_.ortak, is_.hedef_sn, is_.sabit_blok),
+                         ("kisa-oyku", "Lite TTS", "lite", "Fola", ("flash",), None, Z.SABIT_VARSAYILAN),
+                         "yöntemi kaydı olmayan yarım eser sabit planla sürer")
+        self.assertEqual(s.depo.oku().atama, {"kisa-oyku": "flash"}, "ortak araç atamayı değiştirmez")
+
+    def test_yeni_eser_uyarlamali_sabit_bloklu_arac_sabit(self):
+        for gunluk, beklenen in (((10, 0, 0), (Z.UYARLAMALI, 1000, None)), ((0, 0, 10), (Z.SABIT, None, 2000))):
+            with self.subTest(gunluk=gunluk):
+                self.setUp()
+                s = Sahne(self, {"kisa-oyku": 1000})
+                s.cikislar = [Cikis.KOTA]
+                s.zamanlayici(gunluk=gunluk).calis(tur_siniri=1)
+                (is_,) = s.isler
+                self.assertEqual((s.depo.oku().yontem["kisa-oyku"], is_.hedef_sn, is_.sabit_blok), beklenen)
+                self.assertEqual(s.kayitlar[0].split(" — ")[1], ("Lite TTS (Fola), hedef 1000 sn/istek" if gunluk[0]
+                                                                  else "3.1 TTS (Sulafat), 2000 kr'lik bloklar"))
+
+
 if __name__ == "__main__":
     unittest.main()

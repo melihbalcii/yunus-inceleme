@@ -410,5 +410,25 @@ class UyarlamaliPlanTesti(OkuyucuTabani):
         self.assertLessEqual(max(len(m) for m in tts.istekler), M.EN_COK_KR)
 
 
+class JsonVeVarsayilanTesti(GeciciKokTesti):
+    def test_json_yaz_turkce_harf_girinti_yarim_dosya_yok(self):
+        yol = self.kok / "k.json"
+        O._json_yaz(yol, {"ad": "çağrı"}, girinti=1)
+        self.assertEqual(yol.read_text(encoding="utf-8"), '{\n "ad": "çağrı"\n}')
+        O._json_yaz(yol, [1, 2])
+        self.assertEqual(yol.read_text(encoding="utf-8"), "[1, 2]")
+        self.assertEqual([p.name for p in self.kok.iterdir() if p.name.startswith("k.json")], ["k.json"])
+
+    def test_varsayilan_olcum_whisper_dokumunu_metinle_karsilastirir(self):
+        from unittest import mock
+        o = O.Okuyucu(SahteTTS(), O.OkumaAyari(model="m", ses="Fola"), self.y)
+        self.assertIs(o._kalite, O.S.kalite)
+        self.assertIs(o._gun, O.kota_gunu)
+        self.assertIs(o._yamala, O.varsayilan_yama)
+        self.assertIs(o.bildir, print)
+        with mock.patch.object(O.S, "dok", lambda s: "Bir iki üç dört"):
+            self.assertEqual(o._olc("Bir iki üç dört", ses(0.1)), (1.0, []))
+
+
 if __name__ == "__main__":
     unittest.main()
