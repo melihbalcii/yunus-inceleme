@@ -26,16 +26,16 @@ jobs:
       contents: read
       actions: read
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           persist-credentials: false
       - name: OpenSSF Scorecard
-        uses: ossf/scorecard-action@v2.4.4
+        uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc  # v2.4.4
         with:
           results_file: scorecard.json
           results_format: json
           publish_results: false
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: scorecard
           path: scorecard.json
@@ -51,11 +51,11 @@ jobs:
       actions: read
       issues: write            # haftalık rapor kaydı
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@v7.0.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.11"
           cache: pip
@@ -72,7 +72,7 @@ jobs:
           echo "aa299966b52f16a8594f1cd0d1e9049dc2e8fe2c04a90c19860e2719b2b95d15  .cache/toxiproxy/toxiproxy-server-darwin-arm64" | shasum -a 256 -c
           chmod +x .cache/toxiproxy/toxiproxy-server-darwin-arm64
 
-      - uses: actions/setup-node@v7.0.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
           node-version: "24"
           cache: npm
@@ -84,16 +84,16 @@ jobs:
           npm ci --no-audit --no-fund
           npx playwright install chromium
 
-      - uses: denoland/setup-deno@v2.0.4
+      - uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282  # v2.0.4
 
       - name: CodeQL hazırlık
-        uses: github/codeql-action/init@v4.39.2
+        uses: github/codeql-action/init@1fc58d04a4d4374f921bdac573c3811c240f9c26  # v4.39.2
         with:
           languages: python, javascript-typescript
           build-mode: none
 
       - name: CodeQL tarama
-        uses: github/codeql-action/analyze@v4.39.2
+        uses: github/codeql-action/analyze@1fc58d04a4d4374f921bdac573c3811c240f9c26  # v4.39.2
         with:
           output: codeql-sonuc
 
@@ -115,7 +115,7 @@ jobs:
           EOF
 
       - name: Scorecard sonucunu al
-        uses: actions/download-artifact@v8.0.1
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         continue-on-error: true   # Scorecard işi başarısızsa bu ölçüm "ÖLÇÜLMEDİ" kalır
         with:
           name: scorecard
@@ -145,7 +145,7 @@ jobs:
               print(f"| {k['ad']} | {'TUTTU' if k['durum'] else ('ÖLÇÜLMEDİ' if k['durum'] is None else 'TUTMADI')} {k['ek']} |")
           EOF
 
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         if: always()
         with:
           name: puanlama-sonuclari
