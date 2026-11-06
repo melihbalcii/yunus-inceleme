@@ -281,3 +281,49 @@ class SorunluBlokSilmeTesti(GeciciKokTesti):
         self._kontrol([(2, 0.5, []), (3, 0.5, [])])
         self.dosyalar[2].unlink()
         self.assertEqual(Z.sorunlu_bloklari_sil("kisa-oyku", self.y), 1)
+
+
+class HedefSureVeKapasiteTesti(GeciciKokTesti):
+    """Blok boyu (hedef ses süresi) ölçülen sınırlardan: büyük olursa model keser, küçük olursa istek boşa gider."""
+
+    def sinir(self, kayit):
+        self.y.sinir.write_text(json.dumps(kayit))
+
+    def test_olcum_yoksa_varsayilan_aile_var_ama_sonuc_yoksa_540(self):
+        self.assertEqual(Z.hedef_sn("gemini-3.8-flash-tts", self.y), Z.VARSAYILAN_HEDEF)
+        self.sinir({"gemini-3.8-flash-tts": {"sn": 900, "durum": "bilinmiyor"}})
+        self.assertEqual(Z.hedef_sn("gemini-3.8-flash-tts", self.y), 540)
+
+    def test_tam_okunanin_yuzde_92si_sinirlar_icinde(self):
+        for tam, beklenen in ((1233, 1134), (500, Z.VARSAYILAN_HEDEF), (2000, Z.EN_UZUN_HEDEF)):
+            self.sinir({"gemini-3.8-flash-lite-tts": {"sn": tam, "durum": "tam"},
+                        "gemini-3.8-flash-tts": {"sn": 100, "durum": "tam"}})
+            self.assertEqual(Z.hedef_sn("gemini-3.8-flash-tts", self.y), beklenen, tam)
+
+    def test_yalniz_kesik_olcum_varsa_en_kisasinin_yuzde_88i_en_az_470(self):
+        self.sinir({"gemini-2.5-flash-preview-tts": {"sn": 1000, "durum": "kesik"},
+                    "gemini-2.5-pro-tts": {"sn": 1200, "durum": "kesik"}})
+        self.assertEqual(Z.hedef_sn("gemini-2.5-flash-preview-tts", self.y), 880)
+        self.sinir({"gemini-2.5-flash-preview-tts": {"sn": 400, "durum": "kesik"}})
+        self.assertEqual(Z.hedef_sn("gemini-2.5-flash-preview-tts", self.y), 470)
+
+    def test_baska_ailenin_olcumu_kullanilmaz(self):
+        self.sinir({"gemini-2.5-flash-preview-tts": {"sn": 1233, "durum": "tam"}})
+        self.assertEqual(Z.hedef_sn("gemini-3.8-flash-tts", self.y), Z.VARSAYILAN_HEDEF)
+
+    def test_bozuk_sinir_kaydi_varsayilana_doner(self):
+        self.y.sinir.write_text("{bozuk")
+        self.assertEqual(Z.hedef_sn("gemini-3.8-flash-tts", self.y), Z.VARSAYILAN_HEDEF)
+
+    def test_kapasite_ve_kurulum(self):
+        from sesli import olcum
+        lite, flash, k31 = Z.ARACLAR
+        self.assertEqual(Z.kapasite(k31, self.y), Z.SABIT_KAPASITE)
+        self.assertEqual(Z.kapasite(lite, self.y), Z.GUNLUK_ISTEK * Z.VARSAYILAN_HEDEF * olcum.VARSAYILAN_HIZ * 0.8)
+        self.y.olcum.write_text("".join(json.dumps({"model": lite.model, "iyi": False}) + "\n" for _ in range(10)))
+        self.assertEqual(Z.kapasite(lite, self.y), Z.GUNLUK_ISTEK * Z.VARSAYILAN_HEDEF * olcum.VARSAYILAN_HIZ * 0.4,
+                         "başarı oranı ne kadar düşük olursa olsun en az 0,4 sayılır")
+        z = Z.kur(self.y, {lite.model: 0, k31.model: 3})
+        self.assertEqual([(a.model, a.gunluk) for a in z.araclar],
+                         [(lite.model, 0), (flash.model, Z.GUNLUK_ISTEK), (k31.model, 3)])
+        self.assertEqual(z.araclar[2].kapasite, Z.SABIT_KAPASITE)
