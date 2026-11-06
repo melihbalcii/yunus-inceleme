@@ -122,3 +122,69 @@ class UretTesti(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class IstekIcerigiVeDefterTesti(unittest.TestCase):
+    """Gemini'ye giden isteğin içeriği ve istek defteri. Defterdeki zaman ve özet, kayıt denetiminin "aynı metin iki kez
+    okundu mu", "aynı anda iki istek var mı" sorularının dayanağıdır."""
+
+    class KayitliIstemci:
+        def __init__(self, yanitlar):
+            self.yanitlar = list(yanitlar)
+            self.models = self
+            self.cagrilar: list[dict] = []
+
+        def generate_content(self, **kw):
+            self.cagrilar.append(kw)
+            y = self.yanitlar.pop(0)
+            if isinstance(y, BaseException):
+                raise y
+            return y() if callable(y) else y
+
+    def _tts(self, yanitlar, **ayar):
+        istemci = self.KayitliIstemci(yanitlar)
+        self.defter: list[dict] = []
+        self.mesajlar: list[str] = []
+        saat = iter(float(x) for x in range(1_762_400_000, 1_762_500_000, 7))
+        t = G.GeminiTTS(G.Arac("Deneme TTS", "deneme-model", "Fola"), "anahtar", bildir=self.mesajlar.append,
+                        uyu=lambda s: None, istemci_kur=lambda: istemci, defter=self.defter.append,
+                        **({"saat": lambda: next(saat)} | ayar))
+        return t, istemci
+
+    def test_istek_metni_modeli_ve_sesi_tasir(self):
+        t, istemci = self._tts([_yanit(_wav(0.1))])
+        t.uret("Kapı açıldı.")
+        (c,) = istemci.cagrilar
+        self.assertEqual(c["model"], "deneme-model")
+        self.assertEqual(c["contents"], G.istem("Kapı açıldı."))
+        self.assertIn("Kapı açıldı.", c["contents"])
+        ayar = c["config"]
+        self.assertEqual(ayar.speech_config.voice_config.prebuilt_voice_config.voice_name, "Fola")
+        self.assertEqual(ayar.temperature, 1)
+        self.assertEqual([str(m).lower().rsplit(".", 1)[-1] for m in ayar.response_modalities], ["audio"])
+
+    def test_defter_kaydi_tam_ve_denetimin_okuyacagi_bicimde(self):
+        import datetime as dt
+        import hashlib
+        t, _ = self._tts([_yanit(_wav(0.5))])
+        t.uret("Kapı açıldı.")
+        (k,) = self.defter
+        zaman = dt.datetime.strptime(k["zaman"], "%Y-%m-%dT%H:%M:%S%z")
+        self.assertEqual(zaman.timestamp(), 1_762_400_000)
+        self.assertEqual({x: v for x, v in k.items() if x != "zaman"},
+                         {"model": "deneme-model", "kr": 12, "sonuc": "ses", "sn": 7.0, "ses_sn": 0.5,
+                          "ozet": hashlib.md5("Kapı açıldı.".encode()).hexdigest()[:12]})
+
+    def test_basarisiz_istegin_kaydinda_ses_suresi_yok(self):
+        from google.genai import errors
+        t, _ = self._tts([errors.ServerError(503, {"error": {"code": 503, "message": "x", "status": "X"}}),
+                          _yanit(_wav(0.1))])
+        t.uret("metin")
+        self.assertEqual([k["sonuc"] for k in self.defter], ["kayip", "ses"])
+        self.assertNotIn("ses_sn", self.defter[0])
+
+    def test_sayac_her_istekte_artar(self):
+        t, _ = self._tts([_yanit(_wav(0.1)), _yanit(_wav(0.1)), _yanit(_wav(0.1))])
+        for _ in range(3):
+            t.uret("metin")
+        self.assertEqual(t.atilan, 3)
