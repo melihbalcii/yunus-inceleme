@@ -326,5 +326,56 @@ class HedefSureVeKapasiteTesti(GeciciKokTesti):
         self.assertEqual(z.araclar[2].kapasite, Z.SABIT_KAPASITE)
 
 
+class GercekBagimlilikTesti(GeciciKokTesti):
+    """Zamanlayıcının gerçek dünyaya bağlantısı (öbür testler sahte bağımlılık kullanır)."""
+
+    def test_baglantilar_gercek_islevlere_gider(self):
+        import contextlib
+        import io
+        import re
+        from unittest import mock
+        from sesli import ses as S
+        from sesli.kontrol import KontrolSonucu
+        from testler.yardim import ses
+        b = Z.gercek_bagimliliklar(self.y)
+        self.assertIs(b.bekle, Z.duvar_saatiyle_bekle)
+        self.assertEqual(b.simdi, dt.datetime.now)
+        self.assertEqual(len(b.katalog()), 4)
+        self.metin_yaz("kisa-oyku", ["Bir.", "İki."])
+        cikti = io.StringIO()
+        with contextlib.redirect_stdout(cikti):
+            isler = b.kuyruk(b.katalog())
+            b.kayit("deneme satırı")
+        self.assertIn("kisa-oyku", [i.ad for i in isler])
+        self.assertTrue((self.y.fola_klasoru("kisa-oyku") / "seslendirme-metni.txt").exists(), "zamanlayıcı metni hazırlar")
+        self.assertRegex(cikti.getvalue(), r"(?m)^\d{2}\.\d{2} \d{2}:\d{2} deneme satırı$")
+
+        fola = self.y.fola_klasoru("kisa-oyku")
+        S.mp3_yaz(fola / "kisa-oyku.mp3", ses(0.5))
+        KontrolSonucu(eslesme=98.5).yaz(fola)
+        (fola / "kalite.json").write_text(json.dumps([{"no": 1, "bozuk": False}]))
+        (fola / "motor.json").write_text(json.dumps({"motor": "Gemini 3.8 Flash TTS", "model": "m", "ses": "Fola"}))
+        eski = self.y.teslim / "Gemini 3.8 Flash Lite"
+        eski.mkdir(parents=True)
+        (eski / "01 - Kısa Öykü - Yazar Bir.mp3").write_bytes(b"eski")
+        import os
+        os.utime(eski / "01 - Kısa Öykü - Yazar Bir.mp3", (1_700_000_000, 1_700_000_000))  # yeni okumadan eski
+        cikti = io.StringIO()
+        with contextlib.redirect_stdout(cikti):
+            self.assertIs(b.teslim("kisa-oyku"), TeslimDurumu.KONULDU)
+        satirlar = [re.sub(r"^\S+ \S+ ", "", x) for x in cikti.getvalue().splitlines()]
+        self.assertEqual(satirlar, ["konuldu: Gemini 3.8 Flash/01 - Kısa Öykü - Yazar Bir.mp3 (eşleşme %98.50)",
+                                    "eski hâli Çöp Sepeti'ne kondu: Gemini 3.8 Flash Lite - 01 - Kısa Öykü - Yazar Bir.mp3"])
+        with contextlib.redirect_stdout(io.StringIO()) as sessiz:
+            self.assertIs(b.teslim("kisa-oyku"), TeslimDurumu.GUNCEL)
+        self.assertEqual(sessiz.getvalue(), "", "güncelse günlüğe bir şey yazılmaz")
+
+        self.assertEqual(b.sorunlu_dosyalari_sil("kisa-oyku"), 0)
+        self.assertEqual(b.hedef_sn("gemini-3.8-flash-tts"), Z.VARSAYILAN_HEDEF)
+        self.assertEqual(b.bosa_giden(), 0)
+        with mock.patch.object(Z, "calistir", lambda is_, y: (is_, y)):
+            self.assertEqual(b.calistir("iş"), ("iş", self.y))
+
+
 if __name__ == "__main__":
     unittest.main()
