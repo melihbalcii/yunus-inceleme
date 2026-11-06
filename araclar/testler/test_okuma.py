@@ -19,7 +19,9 @@ def iyi_kalite(ses_):
     return 3.6, 3.5
 
 
-class OkuyucuTesti(GeciciKokTesti):
+class OkuyucuTabani(GeciciKokTesti):
+    """Okuyucu testlerinin ortak yardımcıları (test içermez: alt sınıflar testleri tekrarlamasın)."""
+
     def okuyucu(self, tts, *, olc=iyi_olcum, kalite=iyi_kalite, yamala=None, **ayar):
         a = O.OkumaAyari(model="m1", ses="Fola", **({"hedef_sn": 60} | ayar))
         self.mesajlar: list[str] = []
@@ -30,6 +32,8 @@ class OkuyucuTesti(GeciciKokTesti):
         d = self.metin_yaz("kisa-oyku", [f"Paragraf {i}. " + "k" * boy for i in range(paragraf_sayisi)])
         return d, self.y.fola_klasoru("kisa-oyku") / "kisa-oyku.mp3"
 
+
+class OkuyucuTesti(OkuyucuTabani):
     def test_eser_okunur_ve_kayitlar_yazilir(self):
         metin, cikti = self.eser()
         cikti.parent.mkdir(parents=True)
@@ -134,17 +138,14 @@ class OkuyucuTesti(GeciciKokTesti):
     def test_ses_suresi_bloklarin_toplami(self):
         metin, cikti = self.eser(paragraf_sayisi=3, boy=150)
         cikti.parent.mkdir(parents=True)
-        tts = SahteTTS()
+        tts = SahteTTS(kr_sn=15.0)
         sure = self.okuyucu(tts).eseri_oku(metin, cikti)
         beklenen = sum(max(0.5, len(m) / 15.0) + O.BLOK_ARASI for m in tts.istekler) / 60
         self.assertAlmostEqual(sure, beklenen, delta=1 / SR)
 
 
-if __name__ == "__main__":
-    unittest.main()
 
-
-class OkumaKayitlariTesti(OkuyucuTesti):
+class OkumaKayitlariTesti(OkuyucuTabani):
     """Okumanın yan çıktıları: ölçüm kaydı (okuma hızı ve başarı oranı buradan hesaplanır), günlük satırları (kayıt
     denetimi bunları okur) ve blok planı (ortak araç onu sürdürür; yanlış kullanılırsa bloklar baştan okunur)."""
 
@@ -214,3 +215,7 @@ class OkumaKayitlariTesti(OkuyucuTesti):
                 kimlik = json.loads((cikti.parent / "blok-plan.json").read_text())["kimlik"]
                 self.assertEqual((kimlik["model"], kimlik["ses"]), ("m2", ayar.get("ses", "Fola")))
                 self.assertGreater(len(o.tts.istekler), 0, "başka araç/ses önbellekteki blokları kullanamaz")
+
+
+if __name__ == "__main__":
+    unittest.main()

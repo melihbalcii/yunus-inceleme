@@ -118,9 +118,6 @@ class UretTesti(unittest.TestCase):
         self.assertTrue(G.istem("metin").endswith("## Transcript:\nmetin"))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class IstekIcerigiVeDefterTesti(unittest.TestCase):
     """Gemini'ye giden isteğin içeriği ve istek defteri. Defterdeki zaman ve özet, kayıt denetiminin "aynı metin iki kez
@@ -186,3 +183,7 @@ class IstekIcerigiVeDefterTesti(unittest.TestCase):
         for _ in range(3):
             t.uret("metin")
         self.assertEqual(t.atilan, 3)
+
+
+if __name__ == "__main__":
+    unittest.main()

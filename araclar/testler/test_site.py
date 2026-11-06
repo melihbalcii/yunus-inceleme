@@ -54,7 +54,9 @@ class BolmeTesti(GeciciKokTesti):
             site.bol(b"\x00" * 1000, self.kok / "p")
 
 
-class YayinTesti(GeciciKokTesti):
+class YayinTabani(GeciciKokTesti):
+    """Yayın testlerinin ortak kurulumu (test içermez)."""
+
     def kur(self):
         (self.y.kitaplik / "public").mkdir(parents=True)
         (self.y.kitaplik / "public" / "index.html").write_text("<html>")
@@ -68,6 +70,8 @@ class YayinTesti(GeciciKokTesti):
         (self.y.teslim / "Gemini 3.8 Live" / "02 - Uzun Roman - Yazar İki.mp3").write_bytes(b"x")
         self.metin_yaz("uzun-roman", ["uzun roman metni"])
 
+
+class YayinTesti(YayinTabani):
     def test_yayin_hazirlanir_kuru_calisma_ayni_sonucu_verir(self):
         self.kur()
         katalog, yakinda = site.hazirla(self.y, bildir=lambda s: None)
@@ -100,7 +104,7 @@ class YayinTesti(GeciciKokTesti):
         self.assertFalse(eski & yeni)
 
 
-class KatalogKaydiTesti(YayinTesti):
+class KatalogKaydiTesti(YayinTabani):
     """Sitenin gösterdiği her şey katalog.json ve yakinda.json'dan gelir: kayıtlar eksiksiz ve doğru olmalı."""
 
     def test_katalog_kaydi_eksiksiz(self):

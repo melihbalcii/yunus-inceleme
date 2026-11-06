@@ -190,9 +190,6 @@ class HedefSureTesti(GeciciKokTesti):
         self.assertEqual(Z.hedef_sn("gemini-3.8-flash-tts", self.y), 1134)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class CanliAlarmTesti(GeciciKokTesti):
     """Bugün kota harcayıp ses getirmeyen istekler sınıra ulaşırsa okuma o gün durur (H-001 türü bir sorun canlıda
@@ -327,3 +324,7 @@ class HedefSureVeKapasiteTesti(GeciciKokTesti):
         self.assertEqual([(a.model, a.gunluk) for a in z.araclar],
                          [(lite.model, 0), (flash.model, Z.GUNLUK_ISTEK), (k31.model, 3)])
         self.assertEqual(z.araclar[2].kapasite, Z.SABIT_KAPASITE)
+
+
+if __name__ == "__main__":
+    unittest.main()

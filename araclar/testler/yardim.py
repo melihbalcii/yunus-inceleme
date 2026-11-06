@@ -60,7 +60,7 @@ class SahteTTS:
     """Her metin için uzunluğuyla orantılı ses döndürür; istenirse sırayla verilen istisnaları fırlatır.
     `atilan`, gerçek istemcideki gibi kotayı harcamış olabilecek istekleri sayar (kota reddi saymaz)."""
 
-    def __init__(self, hatalar: list[BaseException | None] | None = None, kr_sn: float = 15.0):
+    def __init__(self, hatalar: list[BaseException | None] | None = None, kr_sn: float = 150.0):
         self.istekler: list[str] = []
         self.butceler: list[int] = []
         self.atilan = 0

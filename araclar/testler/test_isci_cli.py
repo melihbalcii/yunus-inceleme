@@ -91,13 +91,17 @@ class BasariliOkumaTesti(GeciciKokTesti):
         self.assertIn("kontrol: eşleşme %95.00, 0,90 altı 1, atlama 1 — GEÇMEDİ\n", cikti)
 
 
-class CliTesti(GeciciKokTesti):
+class CliTabani(GeciciKokTesti):
+    """CLI testlerinin ortak yardımcısı (test içermez)."""
+
     def calistir(self, *arg: str) -> tuple[int, str]:
         cikti, uyari = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(cikti), contextlib.redirect_stderr(uyari):
             kod = cli.main(list(arg), yollar=self.y)
         return kod, cikti.getvalue() + uyari.getvalue()
 
+
+class CliTesti(CliTabani):
     def test_durum(self):
         self.metin_yaz("kisa-oyku", ["kısa"])
         self.y.durum.write_text(json.dumps({"atama": {"kisa-oyku": "m1"}, "ortak": {"kisa-oyku": ["m2"]}}))
@@ -164,7 +168,7 @@ class AyristiriciTesti(unittest.TestCase):
             self.assertIn(parca, yardim)
 
 
-class DurumCiktisiTesti(CliTesti):
+class DurumCiktisiTesti(CliTabani):
     def test_durum_her_eserin_durumunu_ve_bugunku_istekleri_yazar(self):
         from sesli.kota import kota_gunu
         import datetime as dt
