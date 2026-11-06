@@ -1,9 +1,9 @@
 // Şifre kapısı testleri. Çalıştırma (kitaplik/ içinden): node --test testler/
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { kapi } from "../netlify/edge-functions/kapi.ts";
+import kapiIsleyici, { config, kapi } from "../netlify/edge-functions/kapi.ts";
 import {
-  acikMi, cerezDegeri, cereziBul, esitMi, imzala, oturumGecerliMi, sade, sifreDogruMu,
+  acikMi, CEREZ, cerezDegeri, cereziBul, esitMi, imzala, oturumGecerliMi, sade, sifreDogruMu, YIL_SN,
 } from "../netlify/lib/oturum.ts";
 
 const SIR = "deneme-anahtari";
@@ -100,4 +100,76 @@ test("kapı: yanlış şifre ve bozuk gövde giriş sayfasına hata ile döner",
 test("kapı: ayar eksikse hiçbir şey açılmaz", async () => {
   const eksik = { get: (ad: string) => (ad === "SIFRE" ? "x" : undefined) };
   assert.equal((await kapi(istek("/stil.css"), eksik, SIMDI))?.status, 503);
+});
+
+test("kapı bütün sitede çalışır ve Netlify ortamını kullanır", async () => {
+  assert.deepEqual(config, { path: "/*" });
+  (globalThis as unknown as { Netlify: unknown }).Netlify = { env: ORTAM };
+  const y = await kapiIsleyici(istek("/katalog.json"), {} as never);
+  assert.equal(y?.status, 401);
+});
+
+test("açık yolların hepsi açık, açılış resmi deseni iki uçtan sıkı", () => {
+  for (const y of ["/giris", "/giris.html", "/stil.css", "/simge.svg", "/giris-foto.jpg", "/giris-foto.webp",
+    "/manifest.webmanifest", "/simge-180.png", "/simge-192.png", "/simge-512.png", "/favicon.ico"]) assert.ok(acikMi(y), y);
+  for (const y of ["/x/acilis/1170x2532.png", "/acilis/1170x2532.png.bak", "/acilis/1170x2532.pngx", "/giris/", "/Giris"]) {
+    assert.ok(!acikMi(y), y);
+  }
+});
+
+test("ayarlardan biri bile eksikse kapı kapalı kalır", async () => {
+  for (const ortam of [{ SIFRE: "x" }, { ANAHTAR: "y" }, { SIFRE: "", ANAHTAR: "y" }, {}]) {
+    const r = await kapi(istek("/giris.html"), { get: (ad: string) => (ortam as Record<string, string>)[ad] }, SIMDI);
+    assert.equal(r?.status, 503, JSON.stringify(ortam));
+    assert.equal(await r?.text(), "site ayarı eksik");
+  }
+});
+
+test("yalnız POST /giris şifre denetler; başka istekler oturum ister", async () => {
+  assert.equal(await kapi(istek("/giris"), ORTAM, SIMDI), undefined, "GET /giris açık sayfa");
+  const baska = await kapi(istek("/katalog.json", { method: "POST", body: new URLSearchParams({ sifre: "kitaplık" }) }),
+    ORTAM, SIMDI);
+  assert.equal(baska?.status, 401);
+  assert.equal(baska?.headers.get("Set-Cookie"), null, "başka yola POST çerez vermez");
+  assert.equal(await baska?.text(), "giriş gerekli");
+});
+
+test("yalnız GET/HEAD sayfa isteği girişe yönlenir", async () => {
+  const html = { Accept: "text/html,application/xhtml+xml" };
+  assert.equal((await kapi(istek("/", { method: "HEAD", headers: html }), ORTAM, SIMDI))?.status, 302);
+  assert.equal((await kapi(istek("/", { method: "POST", headers: html, body: "x" }), ORTAM, SIMDI))?.status, 401);
+  assert.equal((await kapi(istek("/"), ORTAM, SIMDI))?.status, 401, "Accept yoksa sayfa sayılmaz");
+  assert.equal((await kapi(istek("/", { headers: { Accept: "application/json" } }), ORTAM, SIMDI))?.status, 401);
+});
+
+test("form boyu sınırı tam 4096 baytta", async () => {
+  const govde = (n: number) => istek("/giris", { method: "POST", body: "sifre=x", headers: {
+    "Content-Type": "application/x-www-form-urlencoded", "Content-Length": String(n) } });
+  const sinirda = await kapi(govde(4096), ORTAM, SIMDI);
+  assert.equal(sinirda?.status, 303, "4096 bayt denetlenir (yanlış şifre)");
+  const asan = await kapi(govde(4097), ORTAM, SIMDI);
+  assert.equal(asan?.status, 413);
+  assert.equal(await asan?.text(), "istek çok büyük");
+});
+
+test("şifre alanı yoksa giriş olmaz", async () => {
+  const y = await kapi(istek("/giris", { method: "POST", body: new URLSearchParams({ baska: "kitaplık" }) }), ORTAM, SIMDI);
+  assert.equal(y?.headers.get("Location"), "https://site.test/giris?hata=1");
+});
+
+test("çerez bitişi tam bir yıl; bitiş anında geçerli, sonra değil; biçim sıkı", async () => {
+  const deger = await cerezDegeri(SIR, SIMDI);
+  const [bitis, imza] = deger.split(".");
+  assert.equal(Number(bitis), SIMDI + YIL_SN * 1000);
+  assert.match(imza, /^[A-Za-z0-9_-]{43}$/, "base64url, dolgusuz");
+  assert.ok(await oturumGecerliMi(`${CEREZ}=${deger}`, SIR, Number(bitis)));
+  assert.ok(!(await oturumGecerliMi(`${CEREZ}=${deger}`, SIR, Number(bitis) + 1)));
+  for (const b of [`.${imza}`, `x${bitis}.${imza}`, `${bitis}x.${imza}`, `${"9".repeat(17)}.${imza}`]) {
+    assert.ok(!(await oturumGecerliMi(`${CEREZ}=${b}`, SIR, SIMDI)), b);
+  }
+});
+
+test("çerez başlığında boşluklar ve adsız parça", () => {
+  assert.equal(cereziBul("=a.b; kitaplik = c.d "), "c.d");
+  assert.equal(cereziBul("kitaplik"), null);
 });
