@@ -293,10 +293,11 @@ class KunyeTesti(GeciciKokTesti):
         S.mp3_yaz(mp3, ses(0.3))
         kunye_yaz(mp3, Katalog.yukle(self.y).al("kisa-oyku"), "Gemini 3.8 Flash TTS", "Fola")
         k = ID3(mp3)
-        self.assertEqual({a: str(k[a]) for a in ("TIT2", "TPE1", "TALB", "TCON", "TLAN", "TYER")},
+        alanlar = ("TIT2", "TPE1", "TALB", "TCON", "TLAN", "TDRC")  # ID3 v2.4: yıl (TYER) TDRC olarak kaydedilir
+        self.assertEqual({a: str(k[a]) for a in alanlar},
                          {"TIT2": "Kısa Öykü", "TPE1": "Yazar Bir", "TALB": "Sesli Klasikler", "TCON": "Sesli Kitap",
-                          "TLAN": "tur", "TYER": "2026"})
-        self.assertTrue(all(k[a].encoding == 3 for a in ("TIT2", "TPE1", "TALB", "TCON", "TLAN", "TYER")), "UTF-8")
+                          "TLAN": "tur", "TDRC": "2026"})
+        self.assertTrue(all(k[a].encoding == 3 for a in alanlar), "UTF-8")
         (yorum,) = k.getall("COMM")
         self.assertEqual((yorum.lang, yorum.desc, yorum.encoding), ("tur", "", 3))
         self.assertEqual(str(yorum), "Bu kayıt yapay zekâ sesiyle (Gemini 3.8 Flash TTS, Fola) seslendirilmiştir.")
