@@ -145,5 +145,47 @@ class YamaParcalariTesti(unittest.TestCase):
         self.assertIsNone(_birlestir(ses, [_Kesim(0.5, 1.5), _Kesim(1.0, 2.0)]), "çakışan kesimler")
 
 
+class YamaOkumaTesti(unittest.TestCase):
+    """_yamayi_oku: birden çok atlanan yer tek istekte okunur, ses yerlerine göre doğru noktadan bölünür."""
+
+    def oku(self, yazilar, sozler, esik=0.95, uret=None):
+        from sesli.yama import _yamayi_oku
+        ses_, zaman = konus(sozler)
+        self.mesajlar: list[str] = []
+        self.istenen: list[str] = []
+
+        def varsayilan(m):
+            self.istenen.append(m)
+            return ses_
+        return _yamayi_oku(yazilar, uret or varsayilan, esik, self.mesajlar.append, lambda s: zaman)
+
+    def test_iki_yer_tek_istekte_okunur_dogru_bolunur(self):
+        parcalar = self.oku(["Bir iki.", "Üç dört."], [("bir", 0.1), ("iki", 0.2), ("üç", 0.3), ("dört", 0.4)])
+        assert parcalar is not None
+        self.assertEqual(self.istenen, ["Bir iki.\n\nÜç dört."])
+        self.assertEqual([sira(p) for p in parcalar], [[0.1, 0.2], [0.3, 0.4]])
+        uzunluk = len(konus([("x", 0.1)] * 4)[0]) / S.SR
+        self.assertEqual(self.mesajlar, [f"   yama: 2 yer, 18 kr tek istekte, {uzunluk:.1f} sn, eşleşme 1.000"])
+
+    def test_esik_ve_atlama(self):
+        self.assertIsNone(self.oku(["Bir iki üç dört beş."], [("bir", 0.1), ("iki", 0.2)], esik=0.95))
+        self.assertIn("eşleşme", self.mesajlar[0])
+        self.assertIsNone(self.oku(["Bir iki üç kapıyı açtı."], [("bir", 0.1)], esik=0.0))
+        self.assertIn("ATLAMA: ['iki üç kapıyı açtı']", self.mesajlar[0])
+        self.assertIsNotNone(self.oku(["Bir iki."], [("bir", 0.1), ("iki", 0.2)], esik=1.0), "tam eşik tutar")
+
+    def test_bos_yanit_ve_guvenlik_reddi_onarilamaz(self):
+        from sesli.gemini import BosYanit
+        for hata in (BosYanit("x"), GuvenlikReddi(10)):
+            def uret(m, h=hata):
+                raise h
+            self.assertIsNone(self.oku(["Bir."], [("bir", 0.1)], uret=uret))
+            self.assertEqual(self.mesajlar, [])
+
+    def test_yerlerin_sirasi_karisirsa_onarilmaz(self):
+        self.assertIsNone(self.oku(["Bir iki.", "Üç dört."], [("üç", 0.3), ("dört", 0.4), ("bir", 0.1), ("iki", 0.2)],
+                                   esik=0.0))
+
+
 if __name__ == "__main__":
     unittest.main()
