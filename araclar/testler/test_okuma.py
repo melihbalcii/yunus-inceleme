@@ -305,5 +305,34 @@ class YamaDenemesiTesti(OkuyucuTabani):
         self.assertFalse(any("yamalı" in m for m in self.mesajlar))
 
 
+class BolmeTesti(OkuyucuTabani):
+    """Boş yanıtta blok, harf sayısının yarısından ikiye bölünür; yarılar ayrı okunur ve araya duraklama konur."""
+
+    def bol(self, paragraflar):
+        metin = "\n\n".join(paragraflar)
+        self.tts = SahteTTS([G.BosYanit("x")])
+        sonuc = self.okuyucu(self.tts).seslendir(metin, "[3]")
+        return metin, sonuc
+
+    def test_yari_noktasi_ve_yarilar(self):
+        for boylar, sol in (([10, 10, 10, 100], 3), ([100, 10, 10, 10], 1), ([40, 40], 1), ([10, 50, 10], 1)):  # yarıya ulaşan paragraftan önce bölünür
+            with self.subTest(boylar=boylar):
+                self.setUp()
+                ps = [chr(97 + i) * n for i, n in enumerate(boylar)]
+                metin, sonuc = self.bol(ps)
+                self.assertEqual(self.tts.istekler, [metin, "\n\n".join(ps[:sol]), "\n\n".join(ps[sol:])])
+                self.assertIn(f"[3] ikiye bölünüyor ({len(metin)} kr)", self.mesajlar)
+                sureler = [len(ses(max(0.5, len(m) / 150.0))) for m in self.tts.istekler[1:]]
+                self.assertEqual(len(sonuc), sureler[0] + len(O.S.sessizlik(O.BLOK_ARASI)) + sureler[1])
+
+    def test_yarilar_kendi_etiketiyle_ve_kendi_onbellek_dosyasiyla(self):
+        metin, _ = self.bol(["a" * 30, "b" * 30])
+        ayar = O.OkumaAyari(model="m1", ses="Fola", hedef_sn=60)
+        for yari in ("a" * 30, "b" * 30):
+            self.assertTrue(O.blok_dosyasi(self.y.parcalar, yari, ayar).exists())
+        self.assertTrue(any(m.startswith("[3]a ") for m in self.mesajlar))
+        self.assertTrue(any(m.startswith("[3]b ") for m in self.mesajlar))
+
+
 if __name__ == "__main__":
     unittest.main()
