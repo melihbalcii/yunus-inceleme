@@ -282,6 +282,26 @@ class YayinKapilariTesti(YayinTabani):
             site.hazirla(self.y, bildir=lambda s: None, kuru=True)
 
 
+class SiteDosyalariTesti(YayinTabani):
+    def test_alt_klasorler_kopyalanir_ds_store_alinmaz_eskiler_temizlenir(self):
+        self.kur()
+        pub = self.y.kitaplik / "public"
+        (pub / "js").mkdir()
+        (pub / "js" / "1-temel.js").write_text("// program")
+        (pub / ".DS_Store").write_bytes(b"x")
+        site.hazirla(self.y, bildir=lambda s: None)
+        self.assertEqual((self.y.yayin / "js" / "1-temel.js").read_text(), "// program")
+        self.assertFalse((self.y.yayin / ".DS_Store").exists())
+        (self.y.yayin / "eski-klasor").mkdir()
+        (self.y.yayin / "eski.txt").write_text("x")
+        (pub / "js" / "1-temel.js").write_text("// yeni")
+        site.hazirla(self.y, bildir=lambda s: None)
+        self.assertEqual((self.y.yayin / "js" / "1-temel.js").read_text(), "// yeni")
+        self.assertFalse((self.y.yayin / "eski-klasor").exists())
+        self.assertFalse((self.y.yayin / "eski.txt").exists())
+        self.assertTrue(any((self.y.yayin / "ses").iterdir()), "ses parçaları yerinde kalır")
+
+
 class OzetOnbellegiTesti(GeciciKokTesti):
     def test_ozet_dosya_degismedikce_yeniden_okunmaz_degisince_degisir(self):
         mp3, kayit = self.kok / "a.mp3", self.kok / "ozetler.json"

@@ -173,6 +173,15 @@ class TeslimTesti(GeciciKokTesti):
     def test_kontrolden_gecmeyen_konmaz(self):
         self.assertIs(teslim_et(self.hazir_okuma(gecti=False), self.y).durum, TeslimDurumu.KONTROLDEN_GECMEDI)
 
+    def test_kalite_sorununda_eslesme_tasinir(self):
+        eser = self.hazir_okuma(bozuk=True)
+        sonuc = teslim_et(eser, self.y)
+        self.assertEqual((sonuc.durum, sonuc.eslesme, sonuc.hedef), (TeslimDurumu.KALITE_DUSUK, 99.5, None))
+        (self.y.fola_klasoru("kisa-oyku") / "kalite.json").unlink()
+        self.assertEqual(teslim_et(eser, self.y).eslesme, 99.5, "kalite kaydı yoksa da")
+        (self.y.fola_klasoru("kisa-oyku") / "kalite.json").write_text("{bozuk")
+        self.assertIs(teslim_et(eser, self.y).durum, TeslimDurumu.KALITE_DUSUK)
+
     def test_bozuk_ses_konmaz(self):
         self.assertIs(teslim_et(self.hazir_okuma(bozuk=True), self.y).durum, TeslimDurumu.KALITE_DUSUK)
 
