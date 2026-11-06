@@ -285,6 +285,23 @@ class KuyrukHazirlikTesti(GeciciKokTesti):
         self.assertEqual([i.ad for i in kuyruk(Katalog.yukle(self.y), self.y)], ["kisa-oyku", "uzun-roman"])
 
 
+class KunyeTesti(GeciciKokTesti):
+    def test_kunye_alanlari_eksiksiz_ve_utf8(self):
+        from mutagen.id3 import ID3
+        from sesli.teslim import kunye_yaz
+        mp3 = self.kok / "a.mp3"
+        S.mp3_yaz(mp3, ses(0.3))
+        kunye_yaz(mp3, Katalog.yukle(self.y).al("kisa-oyku"), "Gemini 3.8 Flash TTS", "Fola")
+        k = ID3(mp3)
+        self.assertEqual({a: str(k[a]) for a in ("TIT2", "TPE1", "TALB", "TCON", "TLAN", "TYER")},
+                         {"TIT2": "Kısa Öykü", "TPE1": "Yazar Bir", "TALB": "Sesli Klasikler", "TCON": "Sesli Kitap",
+                          "TLAN": "tur", "TYER": "2026"})
+        self.assertTrue(all(k[a].encoding == 3 for a in ("TIT2", "TPE1", "TALB", "TCON", "TLAN", "TYER")), "UTF-8")
+        (yorum,) = k.getall("COMM")
+        self.assertEqual((yorum.lang, yorum.desc, yorum.encoding), ("tur", "", 3))
+        self.assertEqual(str(yorum), "Bu kayıt yapay zekâ sesiyle (Gemini 3.8 Flash TTS, Fola) seslendirilmiştir.")
+
+
 class CopeTasimaTesti(GeciciKokTesti):
     """Hiçbir şey silinmez: eski teslim kopyası Çöp Sepeti'ne gider, oradaki aynı adlı dosyanın üzerine yazılmaz."""
 
