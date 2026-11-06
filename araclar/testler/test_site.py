@@ -104,6 +104,32 @@ class CerceveBasligiTesti(unittest.TestCase):
         self.assertEqual([c.bas for c in site.cerceveler(gecerli + id3v1 + gecerli)], [0, len(gecerli) + 128])
 
 
+class GomuluEtiketTesti(unittest.TestCase):
+    """Etiketin içindeki veri (ör. kapak resmi) MP3 başlığına benzeyen bayt taşıyabilir: etiket atlanmazsa ses sanılır."""
+
+    def test_id3v2_ve_id3v1_icindeki_sahte_cerceve_ses_sayilmaz(self):
+        gecerli = _cerceve(3, 9, 0)
+        govde = _cerceve(2, 8, 1)  # 192 bayt, geçerli başlıklı
+        id3v2 = b"ID3\x04\x00\x00" + bytes([0, 0, 1, 64]) + govde  # boy 192
+        self.assertEqual([c.bas for c in site.cerceveler(id3v2 + gecerli)], [len(id3v2)])
+        id3v1 = b"TAG" + govde[:125]
+        self.assertEqual([c.bas for c in site.cerceveler(gecerli + id3v1 + gecerli)], [0, len(gecerli) + 128])
+        self.assertEqual(len(site.cerceveler(b"id3" + bytes([4, 0, 0, 0, 0, 1, 64]) + govde)), 1, "küçük harf etiket değil")
+
+    def test_tam_sinirdaki_cerceve_boluneblir_hata_iletileri(self):
+        c = _cerceve(3, 9, 0)
+        self.assertEqual(len(site.bol(c, self._k("a"), sinir=len(c))), 1)
+        with self.assertRaisesRegex(site.SiteHatasi, "^tek çerçeve parça sınırından büyük$"):
+            site.bol(c, self._k("b"), sinir=len(c) - 1)
+        with self.assertRaisesRegex(site.SiteHatasi, "^MP3 çerçevesi bulunamadı$"):
+            site.bol(b"\x00" * 50, self._k("c"))
+
+    def _k(self, ad):
+        import tempfile
+        from pathlib import Path
+        return Path(tempfile.mkdtemp()) / ad
+
+
 class BolmeTesti(GeciciKokTesti):
     def test_esit_parcalar_ve_sure_korunur(self):
         veri = _mp3(30.0)

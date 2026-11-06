@@ -217,6 +217,56 @@ class OkumaKayitlariTesti(OkuyucuTabani):
                 self.assertGreater(len(o.tts.istekler), 0, "başka araç/ses önbellekteki blokları kullanamaz")
 
 
+class BekleyenOkumaTesti(OkuyucuTabani):
+    """H-018: diske yazılıp ölçülmeden kalmış okuma, açılışta istek atılmadan ölçülür (aynı süreçte)."""
+
+    def test_bekleyen_okuma_istek_atmadan_olculur(self):
+        metin = "Bir iki üç dört beş."
+        o = self.okuyucu(SahteTTS())
+        depo = o._depo(metin)
+        depo.sakla(ses(1.5))
+        olculen = []
+        tts = SahteTTS()
+        sonuc = self.okuyucu(tts, olc=lambda m, s_: (olculen.append((m, len(s_))), (0.99, []))[1]).seslendir(metin, "[4]")
+        self.assertEqual(tts.istekler, [])
+        self.assertEqual(olculen, [(metin, int(1.5 * SR))])
+        self.assertEqual(len(sonuc), int(1.5 * SR))
+        self.assertIn(f"[4] ölçülmeden kalmış okuma ölçülüyor (yeni istek yok): {depo.bekleyen[0]}", self.mesajlar)
+        yeni = o._depo(metin)
+        self.assertEqual((yeni.bekleyen, [d.dosya for d in yeni.denemeler]), ([], [depo.bekleyen[0]]))
+
+    def test_bozuk_ya_da_dosyasi_olmayan_bekleyen_alinmaz(self):
+        metin = "Bir iki üç."
+        depo = self.okuyucu(SahteTTS())._depo(metin)
+        ad = depo.sakla(ses(0.5))
+        (self.y.parcalar / ad).unlink()
+        kayit = json.loads(depo._kayit.read_text())
+        kayit["bekleyen"] += ["../disari.wav"]
+        depo._kayit.write_text(json.dumps(kayit))
+        self.assertEqual(self.okuyucu(SahteTTS())._depo(metin).bekleyen, [])
+
+
+class PlanDogrulamaTesti(OkuyucuTabani):
+    def test_gecersiz_sinirlar_yok_sayilir_gecerli_kullanilir(self):
+        metin, cikti = self.eser()
+        cikti.parent.mkdir(parents=True)
+        self.okuyucu(SahteTTS()).eseri_oku(metin, cikti)
+        plan_yolu = cikti.parent / "blok-plan.json"
+        kayit = json.loads(plan_yolu.read_text())
+        o = self.okuyucu(SahteTTS())
+        self.assertEqual(o._plan_oku(plan_yolu, 12), (kayit["kimlik"], kayit["sinirlar"]))
+        for sinirlar in ([3, 2], [3, 3], [0, 5], [5, 13], [2.0, 5], "3,6", [True]):
+            with self.subTest(sinirlar=sinirlar):
+                plan_yolu.write_text(json.dumps({"kimlik": kayit["kimlik"], "sinirlar": sinirlar}))
+                self.mesajlar.clear()
+                self.assertEqual(o._plan_oku(plan_yolu, 12), ({}, []))
+                self.assertTrue(self.mesajlar[0].startswith("UYARI:"))
+        plan_yolu.write_text(json.dumps({"kimlik": {"a": [1]}, "sinirlar": [3]}))
+        self.assertEqual(o._plan_oku(plan_yolu, 12), ({}, []))
+        plan_yolu.write_text(json.dumps({"kimlik": kayit["kimlik"]}))
+        self.assertEqual(o._plan_oku(plan_yolu, 12), (kayit["kimlik"], []), "sınırsız plan: yeniden hesaplanır")
+
+
 class EserKayitlariTesti(OkuyucuTabani):
     def test_plan_kalite_ve_bitis_kayitlari_eksiksiz(self):
         metin, cikti = self.eser(paragraf_sayisi=6, boy=300)

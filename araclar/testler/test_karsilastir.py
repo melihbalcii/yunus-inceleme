@@ -47,6 +47,12 @@ class AtlamaTesti(unittest.TestCase):
         self.assertEqual((oran, atla), (1.0, []))
 
 
+class YazimFarkiTesti(unittest.TestCase):
+    def test_harfleri_tutan_ama_farkli_bolunmus_sozler_atlama_degil(self):
+        self.assertFalse(K.kayip_mi(["a", "b", "c", "d", "e", "fghijklmno"], ["abcdefghijklmno"]))
+        self.assertTrue(K.kayip_mi(["a", "b", "c", "d", "e", "fghijklmno"], ["xyz"]))
+
+
 class KarsilastirmaSinirTesti(unittest.TestCase):
     def test_sayi_okunuslari_tablosu(self):
         for n, ok in ((9, "dokuz"), (10, "on"), (15, "on beş"), (20, "yirmi"), (99, "doksan dokuz"), (101, "yüz bir"),
