@@ -121,6 +121,34 @@ class KontrolAyrintiTesti(KontrolTesti):
                 self.assertEqual(self.kontrol(lambda d, k: "x").bloklar[0].duyulan, s.bloklar[0].duyulan)
 
 
+class KontrolOnbellekDosyasiTesti(KontrolTesti):
+    test_iyi_okuma_gecer_ve_onbellek_kullanilir = None  # type: ignore[assignment]
+    test_atlama_varsa_gecmez_ve_ikinci_dinleme_denenir = None  # type: ignore[assignment]
+
+    def test_onbellek_dosyasi_adi_bicimi_ve_ikinci_dinleme_anahtari(self):
+        metin = "Bir gün yaşlı adam denize açıldı ve uzun süre balık tuttu sonra evine döndü."
+        self.okunmus([metin])
+        kontrol_et(self.y.fola_klasoru("kisa-oyku"), self.y.parcalar, bildir=lambda x: None,
+                   dok=lambda d, k: metin if k else "Bir gün yaşlı adam evine döndü.")
+        self.assertEqual(sorted(p.name for p in self.y.parcalar.iterdir() if p.suffix == ".json"), ["yazidokum.json"])
+        yazi = (self.y.parcalar / "yazidokum.json").read_text(encoding="utf-8")
+        self.assertIn("yaşlı", yazi, "Türkçe harfler olduğu gibi")
+        self.assertTrue(yazi.startswith("{\n "), "okunur biçim (girintili)")
+        boy = (self.y.parcalar / "b1.wav").stat().st_size
+        self.assertEqual(json.loads(yazi), {f"b1.wav|{boy}": metin, f"b1.wav|{boy}|2": metin})
+
+    def test_varsayilan_dinleme_whisperi_dosyadaki_sesle_cagirir(self):
+        from unittest import mock
+        from sesli import kontrol as K
+        self.okunmus(["Bir iki üç."])
+        cagri = []
+        with mock.patch.object(K.S, "dok", lambda ses_, onceki_metne_bagli: (cagri.append((len(ses_), onceki_metne_bagli)),
+                                                                              "Bir iki üç.")[1]):
+            s = kontrol_et(self.y.fola_klasoru("kisa-oyku"), self.y.parcalar, bildir=lambda x: None)
+        self.assertEqual(cagri, [(len(S.wav_oku(self.y.parcalar / "b1.wav")), False)])
+        self.assertTrue(s.gecti)
+
+
 class TeslimTesti(GeciciKokTesti):
     def hazir_okuma(self, gecti=True, bozuk=False, motor="Gemini 3.8 Flash Lite TTS"):
         fola = self.y.fola_klasoru("kisa-oyku")
