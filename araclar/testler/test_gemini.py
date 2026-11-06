@@ -185,5 +185,59 @@ class IstekIcerigiVeDefterTesti(unittest.TestCase):
         self.assertEqual(t.atilan, 3)
 
 
+class KotaSiniriTesti(unittest.TestCase):
+    """429: günlük kota bittiyse hemen durulur; dakikalık sınırda Gemini'nin söylediği kadar (+2 sn) beklenir."""
+
+    def _tts(self, davranislar):
+        self.uykular: list[float] = []
+        self.mesajlar: list[str] = []
+        istemci = SahteIstemci(list(davranislar))
+        return G.GeminiTTS(G.Arac("Deneme TTS", "deneme-model", "Fola"), "anahtar", bildir=self.mesajlar.append,
+                           uyu=self.uykular.append, istemci_kur=lambda: istemci)
+
+    def test_gunluk_kota_yazilislari(self):
+        for mesaj in ("requests per day", "GenerateRequestsPerDayPerProject", "PER DAY limit", "perday"):
+            with self.subTest(mesaj=mesaj), self.assertRaises(G.KotaDoldu) as h:
+                self._tts([_istemci_hatasi(429, mesaj)]).uret("x")
+            self.assertIn(mesaj, str(h.exception))
+            self.assertEqual(self.uykular, [], "günlük kotada beklenmez")
+
+    def test_soylenen_sure_kadar_beklenir_yoksa_artan_bekleme(self):
+        t = self._tts([_istemci_hatasi(429, "Please retry in 3s."), _istemci_hatasi(429, "dakikalık sınır"),
+                       _istemci_hatasi(429, "RETRY IN 7 seconds"), _yanit(_wav(0.1))])
+        t.uret("x")
+        self.assertEqual(self.uykular, [5, 60, 9])
+        self.assertEqual(self.mesajlar[:3], ["dakikalık sınır: 5 sn bekleniyor", "dakikalık sınır: 60 sn bekleniyor",
+                                             "dakikalık sınır: 9 sn bekleniyor"])
+        self.assertEqual(t.atilan, 1, "429 kota harcamaz")
+
+    def test_dakikalik_sinir_cok_tekrarlarsa_gecici_hata(self):
+        t = self._tts([_istemci_hatasi(429, "retry in 1")] * G.DAKIKALIK_DENEME)
+        with self.assertRaisesRegex(G.GeciciHata, "dakikalık sınır geçmedi"):
+            t.uret("x")
+        self.assertEqual(len(self.uykular), G.DAKIKALIK_DENEME - 1)
+
+    def test_baska_istemci_hatasi_oldugu_gibi_iletilir(self):
+        from google.genai import errors
+        with self.assertRaises(errors.ClientError) as h:
+            self._tts([_istemci_hatasi(400, "bad request per day")]).uret("x")
+        self.assertEqual(h.exception.code, 400)
+
+
+class DosyaDefteriTesti(unittest.TestCase):
+    def test_her_kayit_bir_satir_turkce_harfler_korunur(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as d:
+            yol = Path(d) / "defter.jsonl"
+            yaz = G.dosya_defteri(yol)
+            yaz({"sonuc": "ses", "not": "çağrı"})
+            yaz({"sonuc": "kayip"})
+            satirlar = yol.read_text(encoding="utf-8").splitlines()
+        self.assertEqual([json.loads(x) for x in satirlar], [{"sonuc": "ses", "not": "çağrı"}, {"sonuc": "kayip"}])
+        self.assertIn("çağrı", satirlar[0], "ensure_ascii=False: defter okunabilir kalsın")
+
+
 if __name__ == "__main__":
     unittest.main()
