@@ -334,5 +334,31 @@ class BolmeTesti(OkuyucuTabani):
         self.assertTrue(any(m.startswith("[3]b ") for m in self.mesajlar))
 
 
+class UyarlamaliPlanTesti(OkuyucuTabani):
+    def test_blok_siniri_okumadan_once_kaydedilir_ertesi_gun_ayni_bloklar(self):
+        metin, cikti = self.eser()
+        cikti.parent.mkdir(parents=True)
+        dun = SahteTTS([None, G.KotaDoldu("bitti")])
+        with self.assertRaises(G.KotaDoldu):
+            self.okuyucu(dun).eseri_oku(metin, cikti)
+        plan = json.loads((cikti.parent / "blok-plan.json").read_text())
+        self.assertEqual(len(plan["sinirlar"]), 2, "ikinci bloğun sınırı istekten önce yazıldı")
+        bugun = SahteTTS()
+        self.okuyucu(bugun).eseri_oku(metin, cikti)
+        self.assertEqual(bugun.istekler[0], dun.istekler[1], "kota biten blok aynı metinle sürer")
+        self.assertEqual(json.loads((cikti.parent / "blok-plan.json").read_text())["sinirlar"][:2], plan["sinirlar"])
+
+    def test_ilk_blok_olculen_hizin_payiyla_sonra_gercek_hizla(self):
+        from sesli import metin as M
+        metin, cikti = self.eser(paragraf_sayisi=30, boy=300)
+        cikti.parent.mkdir(parents=True)
+        tts = SahteTTS(kr_sn=15.0)
+        self.okuyucu(tts, hedef_sn=200).eseri_oku(metin, cikti)
+        ilk_hedef = 200 * O.olcum.VARSAYILAN_HIZ * O.ILK_BLOK_PAYI
+        self.assertLessEqual(len(tts.istekler[0]), ilk_hedef * 1.04 + 400)
+        self.assertGreater(len(tts.istekler[1]), len(tts.istekler[0]), "ölçülen hız (15 kr/sn) payı aşıyor")
+        self.assertLessEqual(max(len(m) for m in tts.istekler), M.EN_COK_KR)
+
+
 if __name__ == "__main__":
     unittest.main()
