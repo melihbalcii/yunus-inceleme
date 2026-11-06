@@ -275,5 +275,46 @@ class KomutTesti(CliTabani):
         self.assertIn("okuma programı zaten çalışıyor; ikinci kopya başlatılmadı", cikti)
 
 
+class AltSurecTesti(GeciciKokTesti):
+    def test_calistir_projenin_pythonu_ile_alt_sureci_baslatir(self):
+        from types import SimpleNamespace
+        from unittest import mock
+        from sesli import isci
+        gelen = []
+        with mock.patch.object(isci.subprocess, "run", lambda arg, check: (gelen.append((arg, check)),
+                                                                            SimpleNamespace(returncode=77))[1]):
+            self.assertIs(isci.calistir(_is(), self.y), Cikis.GECICI)
+        ((arg, check),) = gelen
+        self.assertEqual(arg[:3], [str(self.y.python), "-u", str(self.y.kok / "araclar" / "sesli_kitap.py")])
+        self.assertEqual(arg[3:], _is().arguman())
+        self.assertFalse(check)
+
+    def test_cikis_kodlari_sabit(self):
+        self.assertEqual({c.name: int(c) for c in Cikis},
+                         {"TAMAM": 0, "HATA": 1, "KOTA": 75, "GUVENLIK": 76, "GECICI": 77, "BOLUNEMEZ": 78})
+
+    def test_gercek_tts_anahtari_env_den_okur_defteri_dosyaya_yazar(self):
+        import json
+        from sesli import isci
+        from sesli.ayar import AyarHatasi
+        arac = G.Arac("Deneme TTS", "m", "Fola")
+        with self.assertRaises(AyarHatasi):
+            isci._gercek_tts(arac, self.y, lambda s: None)
+        self.y.gemini_env.write_text("GEMINI_API_KEY=deneme-anahtari\n")
+        t = isci._gercek_tts(arac, self.y, lambda s: None)
+        self.assertIsInstance(t, G.GeminiTTS)
+        self.assertEqual((t.arac, t._anahtar), (arac, "deneme-anahtari"))
+        t._defter({"sonuc": "ses"})
+        self.assertEqual(json.loads(self.y.istek_defteri.read_text()), {"sonuc": "ses"})
+
+
+class OkunussuzAdTesti(unittest.TestCase):
+    def test_ingilizce_gorunen_buyuk_harfli_sozcukler(self):
+        from sesli.ceviri import okunussuz_adlar
+        metin = "Martin İdın ile Ruth, Wiki, Smith-son, Brooks ve Cek konuştu. Ash geldi, Ash gitti. Bugh. Lee."
+        self.assertEqual(okunussuz_adlar(metin), ["Ash", "Brooks", "Bugh", "Lee", "Ruth", "Smith-son", "Wiki"])
+        self.assertEqual(okunussuz_adlar("Ali Veli Ayşe Mehmet."), [])
+
+
 if __name__ == "__main__":
     unittest.main()
