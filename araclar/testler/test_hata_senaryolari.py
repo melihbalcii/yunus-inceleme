@@ -88,6 +88,22 @@ class GeminiIstegiTesti(unittest.TestCase):
         self.assertEqual([k["sonuc"] for k in defter], ["zaman_asimi"])
         olay.set()
 
+    def test_zaman_asimi_kotayi_harcamis_sayar_istek_bitince_yeni_istek_serbest(self):
+        olay = threading.Event()
+        i = SayanIstemci([lambda: (olay.wait(10), _yanit(_wav(0.1)))[1], _yanit(_wav(0.1))])
+        t, defter = _gemini(i, istek_suresi=0.1, en_uzun_bekleme=0.3)
+        with self.assertRaises(G.GeciciHata) as h:
+            t.uret("metin")
+        self.assertEqual(str(h.exception), "istek 0 dk'da yanıt vermedi; yeni istek atılmıyor")
+        self.assertEqual(t.atilan, 1, "yanıt gelmeyen istek de kota harcamış olabilir")
+        olay.set()
+        assert t._ucusta is not None
+        t._ucusta.join(5)
+        self.assertEqual(len(t.uret("metin")), 2400, "askıdaki istek bitince yeni istek atılabilir")
+        self.assertEqual((i.cagri, t.atilan), (2, 2))
+        self.assertEqual([k["sonuc"] for k in defter], ["zaman_asimi", "ses"])
+        self.assertFalse(t._ucusta.daemon is False, "istek iş parçacığı programın kapanmasını engellemez")
+
     def test_baglanilamayan_istek_kota_harcamadan_yinelenir(self):
         i = SayanIstemci([httpx.ConnectError("yok"), httpx.ConnectTimeout("yok"), _yanit(_wav(0.1))])
         t, defter = _gemini(i)
