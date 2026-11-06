@@ -239,5 +239,46 @@ class DosyaDefteriTesti(unittest.TestCase):
         self.assertIn("çağrı", satirlar[0], "ensure_ascii=False: defter okunabilir kalsın")
 
 
+class BosYanitTesti(unittest.TestCase):
+    """Gemini'nin sesi olmayan yanıtları: güvenlik reddi (blok bölünür ya da araç bırakılır) ile boş yanıt ayrılır."""
+
+    def uret(self, yanit, metin="metin"):
+        self.defter: list[dict] = []
+        self.mesajlar: list[str] = []
+        istemci = SahteIstemci([yanit])
+        t = G.GeminiTTS(G.Arac("Deneme TTS", "deneme-model", "Fola"), "anahtar", bildir=self.mesajlar.append,
+                        uyu=lambda s: None, istemci_kur=lambda: istemci, defter=self.defter.append)
+        return t.uret(metin)
+
+    def test_adaysiz_icerisiz_parcasiz_yanitlar_bos(self):
+        from types import SimpleNamespace as N
+        for yanit in (N(candidates=[], prompt_feedback="engel"), N(candidates=None, prompt_feedback=None),
+                      N(candidates=[N(content=None, finish_reason="OTHER")], prompt_feedback=None),
+                      N(candidates=[N(content=N(parts=[]), finish_reason="MAX_TOKENS")], prompt_feedback=None)):
+            with self.subTest(yanit=yanit), self.assertRaises(G.BosYanit):
+                self.uret(yanit)
+            self.assertEqual([k["sonuc"] for k in self.defter], ["bos"])
+            self.assertTrue(self.mesajlar[0].startswith("boş yanıt: bitiş sebebi "), self.mesajlar)
+
+    def test_bos_yanit_iletisi_sebebi_ve_geri_bildirimi_tasir(self):
+        from types import SimpleNamespace as N
+        with self.assertRaises(G.BosYanit) as h:
+            self.uret(N(candidates=[N(content=None, finish_reason="OTHER")], prompt_feedback="istem notu"))
+        self.assertEqual(str(h.exception), "OTHER")
+        self.assertEqual(self.mesajlar, ["boş yanıt: bitiş sebebi OTHER, istem geri bildirimi istem notu"])
+
+    def test_guvenlik_ve_yasakli_icerik_reddi(self):
+        for sebep in ("FinishReason.SAFETY", "PROHIBITED_CONTENT"):
+            with self.subTest(sebep=sebep), self.assertRaises(G.GuvenlikReddi) as h:
+                self.uret(_yanit(None, sebep=sebep), metin="x" * 1500)
+            self.assertEqual((str(h.exception), h.exception.bolunebilir), ("güvenlik filtresi reddetti (1500 kr)", True))
+            self.assertEqual([k["sonuc"] for k in self.defter], ["guvenlik"])
+
+    def test_sesli_yanit_defterde_ses_suresiyle(self):
+        self.assertEqual(len(self.uret(_yanit(_wav(0.75)))), int(0.75 * 24000))
+        (k,) = self.defter
+        self.assertEqual((k["sonuc"], k["ses_sn"]), ("ses", 0.8))
+
+
 if __name__ == "__main__":
     unittest.main()
