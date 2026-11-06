@@ -85,5 +85,65 @@ class YamaTesti(unittest.TestCase):
         self.assertIsNone(self.yamala(ses, yanlis))
 
 
+class YamaParcalariTesti(unittest.TestCase):
+    """yamala'nın adımları ayrı ayrı: kesim noktaları, bölge birleştirme, sesin yeniden kurulması."""
+
+    def test_ara_nokta_kenarlarda_bas_ve_son_icte_duraklamanin_ortasi(self):
+        from sesli.yama import _ara_nokta
+        duy = [("a", 0.0, 0.4), ("b", 0.6, 1.0), ("c", 1.5, 1.9)]
+        self.assertEqual(_ara_nokta(duy, 0, 3.0), 0.0)
+        self.assertEqual(_ara_nokta(duy, -1, 3.0), 0.0)
+        self.assertEqual(_ara_nokta(duy, 3, 3.0), 3.0)
+        self.assertEqual(_ara_nokta(duy, 1, 3.0), 0.5)
+        self.assertEqual(_ara_nokta(duy, 2, 3.0), 1.25)
+
+    def test_kelimeler_her_kelimenin_parcasini_bilir(self):
+        from sesli.yama import _kelimeler
+        self.assertEqual(_kelimeler(["Bir iki.", "", "Üç!"]), (["bir", "iki", "üç"], [0, 0, 2]))
+
+    def test_bitisik_atlanan_cumleler_tek_bolge_olur(self):
+        from sesli.yama import _Dinleme, _eksik_ve_fazla, _eslestir, _kelimeler
+        cumle = ["Bir iki üç.", "Dört beş altı.", "Yedi sekiz dokuz.", "On on bir on iki."]
+        hedef, hangi = _kelimeler(cumle)
+        sozler = ["bir", "iki", "üç", "on", "on", "bir", "on", "iki"]  # 2. ve 3. cümle hiç okunmamış
+        duy = [(w, i * 1.0, i * 1.0 + 0.8) for i, w in enumerate(sozler)]
+        bolgeler, atilacak = _eksik_ve_fazla(_eslestir(hedef, duy), hedef, hangi, _Dinleme(duy, len(duy) * 1.0))
+        self.assertEqual(bolgeler, [[1, 2]], "atlanan 2. ve 3. cümle bitişik: tek bölge")
+        self.assertEqual(atilacak, [])
+
+    def test_kisa_fazla_okuma_kesilmez_uzunu_kesilir(self):
+        from sesli.yama import _Dinleme, _eksik_ve_fazla, _eslestir, _kelimeler
+        hedef, hangi = _kelimeler(["Bir iki üç dört."])
+        for ek, beklenen in ((["eee"], []), (["burada", "fazladan", "okunmuş", "sözler"], [(1.9, 5.9)])):
+            sozler = ["bir", "iki", *ek, "üç", "dört"]
+            duy = [(w, i * 1.0, i * 1.0 + 0.8) for i, w in enumerate(sozler)]
+            _, atilacak = _eksik_ve_fazla(_eslestir(hedef, duy), hedef, hangi, _Dinleme(duy, 10.0))
+            self.assertEqual([(round(a, 2), round(b, 2)) for a, b in atilacak], beklenen, ek)
+
+    def test_cok_fazla_bolge_onarilmaz(self):
+        from sesli.yama import EN_COK_YER, _Dinleme, _kesimler
+        bolgeler = [[i * 2, i * 2] for i in range(EN_COK_YER + 1)]
+        self.assertIsNone(_kesimler(bolgeler, [0], {}, _Dinleme([], 1.0), ["x"]))
+
+    def test_birlestir_yamayi_yerine_koyar_cakisani_reddeder(self):
+        from sesli.yama import _Kesim, _birlestir
+        sr = S.SR
+        ses = np.concatenate([np.full(sr, 0.1), np.full(sr, 0.2), np.full(sr, 0.3)]).astype(np.float32)
+        yama = np.full(sr // 2, 0.9, dtype=np.float32)
+        sonuc = _birlestir(ses, [_Kesim(1.0, 2.0, "x", yama)])
+        assert sonuc is not None
+        bosluk = len(S.sessizlik(0.25))
+        self.assertEqual(len(sonuc), 2 * sr + 2 * bosluk + len(yama))
+        self.assertEqual(sira(sonuc), [0.1, 0.9, 0.3])  # sira() iki basamağa yuvarlar
+        bas = _birlestir(ses, [_Kesim(0.0, 1.0, "x", yama)])  # en başta: önüne sessizlik konmaz
+        assert bas is not None
+        self.assertAlmostEqual(float(bas[0]), 0.9, places=5)
+        self.assertEqual(len(bas), 2 * sr + bosluk + len(yama))
+        kes = _birlestir(ses, [_Kesim(2.0, 3.0)])  # yalnız kesme
+        assert kes is not None
+        self.assertEqual(len(kes), 2 * sr)
+        self.assertIsNone(_birlestir(ses, [_Kesim(0.5, 1.5), _Kesim(1.0, 2.0)]), "çakışan kesimler")
+
+
 if __name__ == "__main__":
     unittest.main()
