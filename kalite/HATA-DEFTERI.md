@@ -7,7 +7,7 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
 
 | Ay | Bizden önce başkasının bulduğu | Araçların bulduğu | Bizim bulduğumuz |
 |---|---|---|---|
-| Kasım 2026 | 1 (Yunus: H-001) | 11 (H-004…H-012, H-014, H-015) | 8 (H-002, H-003, H-013, H-016…H-020) |
+| Kasım 2026 | 1 (Yunus: H-001) | 12 (H-004…H-012, H-014, H-015, H-022) | 10 (H-002, H-003, H-013, H-016…H-021, H-023) |
 
 ## Kayıtlar
 
@@ -179,3 +179,10 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
   "gemini". 3.8 için kodda özel bir istisna vardı; 3.1 "kesik" ölçüm kaydetseydi 3.8 Flash'ın blok boyu sessizce küçülürdü.
 - **Düzeltme:** Aile sürüm numarasıdır (gemini-3.8, gemini-3.1, gemini-2.5); istisna kaldırıldı. Gerçek ölçüm dosyasıyla
   sonuçlar değişmedi (3.8: 1134 sn, 2.5: 470, 3.1: 570). **Tür denetimi:** AileTesti. **Durum:** Düzeltildi.
+
+### H-023 · Kayıt denetimi yeni koddaki bir yeniden deneme iletisini tanımıyordu
+- **Bulan:** Biz (kalan ileti kaçaklarını incelerken), 6 Kasım 2026 · **Tür:** Ölçüm/denetim uyumu
+- **Kök neden:** Denetim, eski kodun "bağlantı koptu ya da zaman aşımı" iletisini arıyordu; yeni kod bağlanamayınca
+  "bağlanılamadı (kota harcanmadı), tekrar" yazıyor. Bu yeniden denemeler sayılmıyordu.
+- **Düzeltme:** Sözcük listesine eklendi. **Tür denetimi:** IletiSozlesmesiTesti, okuma programının gerçek iletilerini
+  denetimin sözcükleriyle karşılaştırır (yeniden deneme, kesinti, yarım deneme). **Durum:** Düzeltildi.
