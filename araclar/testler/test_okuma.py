@@ -251,5 +251,59 @@ class EserKayitlariTesti(OkuyucuTabani):
         self.assertFalse(any("SES KALİTESİ DÜŞÜK" in m for m in self.mesajlar))
 
 
+class YamaDenemesiTesti(OkuyucuTabani):
+    """Eşiği tutmayan ama iyi okunmuş blok önce yamayla onarılır: tek istek, ölçüm kaydında "yama"."""
+
+    def blok(self, yamala, olcumler):
+        olc = iter(olcumler)
+        self.tts = SahteTTS()
+        o = self.okuyucu(self.tts, olc=lambda m, s: next(olc), yamala=yamala)
+        return o.seslendir("Bir iki üç dört beş.", "[1]")
+
+    def test_basarili_yama_tek_istek_butcesiyle_ve_olcum_kaydi(self):
+        istekler = []
+
+        def yamala(metin, ses_, uret, esik, bildir):
+            istekler.append(uret("Bir iki."))
+            return ses(2.0)
+        sonuc = self.blok(yamala, [(0.90, ["iki üç dört"]), (0.991, [])])
+        self.assertEqual(len(sonuc), int(2.0 * SR))
+        self.assertEqual(self.tts.butceler, [O.TEK_ISTEK_BUTCESI, 1], "yama isteği tek hak")
+        self.assertIn("[1] yamalı: eşleşme 0.991", self.mesajlar)
+        son = json.loads(self.y.olcum.read_text().splitlines()[-1])
+        self.assertEqual({k: v for k, v in son.items() if k != "zaman"},
+                         {"model": "m1", "kr": len("Bir iki üç dört beş."), "sn": 2.0, "oran": 0.991, "iyi": True,
+                          "atlama": 0, "yama": True})
+
+    def test_esigi_tutmayan_yama_kullanilmaz_atlamasi_yazilir(self):
+        sonuc = self.blok(lambda *a, **k: ses(1.0), [(0.90, ["x y z"]), (0.93, ["kalan söz"]), (0.99, [])])
+        self.assertNotEqual(len(sonuc), int(1.0 * SR))
+        self.assertIn("[1] yamalı: eşleşme 0.930, ATLAMA: ['kalan söz']", self.mesajlar)
+        self.assertFalse(json.loads(self.y.olcum.read_text().splitlines()[1])["iyi"])
+
+    def test_esik_tam_tutan_ama_atlamali_yama_kullanilmaz(self):
+        sonuc = self.blok(lambda *a, **k: ses(1.0), [(0.90, ["x y z"]), (O.ESIK, ["söz"]), (0.99, [])])
+        self.assertNotEqual(len(sonuc), int(1.0 * SR))
+        self.setUp()  # temiz kök: önceki denemeler diskte (H-018) ve yeniden kullanılırdı
+        sonuc = self.blok(lambda *a, **k: ses(1.0), [(0.90, ["x y z"]), (O.ESIK, [])])
+        self.assertEqual(len(sonuc), int(1.0 * SR), "eşik tam tutuyor ve atlama yok: yama kullanılır")
+
+    def test_kota_biterse_durur_baska_hata_eski_yola_doner(self):
+        with self.assertRaises(G.KotaDoldu):
+            self.blok(lambda *a, **k: (_ for _ in ()).throw(G.KotaDoldu("bitti")), [(0.90, ["x y z"])])
+        self.setUp()
+
+        def bozuk(*a, **k):
+            raise ValueError("beklenmedik")
+        self.blok(bozuk, [(0.90, ["x y z"]), (0.99, [])])
+        self.assertIn("[1] yama yapılamadı: ValueError('beklenmedik')", self.mesajlar)
+        self.assertEqual(len(self.tts.istekler), 2, "yama düşünce blok yeniden okunur")
+
+    def test_yama_onaramazsa_yeniden_okunur(self):
+        self.blok(lambda *a, **k: None, [(0.90, ["x y z"]), (0.99, [])])
+        self.assertEqual(len(self.tts.istekler), 2)
+        self.assertFalse(any("yamalı" in m for m in self.mesajlar))
+
+
 if __name__ == "__main__":
     unittest.main()
