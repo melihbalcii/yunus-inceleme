@@ -57,6 +57,70 @@ class KontrolTesti(GeciciKokTesti):
         self.assertTrue(s.atlamalar)
 
 
+class KontrolAyrintiTesti(KontrolTesti):
+    """Whisper dökümü önbelleği, ikinci dinleme koşulları ve toplam eşleşmenin hesabı."""
+
+    test_iyi_okuma_gecer_ve_onbellek_kullanilir = None  # type: ignore[assignment]  # üst sınıfın testleri bir kez
+    test_atlama_varsa_gecmez_ve_ikinci_dinleme_denenir = None  # type: ignore[assignment]
+
+    def kontrol(self, dok, bildir=lambda x: None):
+        return kontrol_et(self.y.fola_klasoru("kisa-oyku"), self.y.parcalar, bildir=bildir, dok=dok)
+
+    def test_onbellek_anahtari_dosya_ve_boyut_sessizlik_atlanir_bildirim(self):
+        self.okunmus(["Bir iki üç.", "Dört beş."])
+        plan = json.loads((self.y.fola_klasoru("kisa-oyku") / "plan.json").read_text())
+        plan.insert(1, {"no": 9, "tarz": "sessizlik"})
+        (self.y.fola_klasoru("kisa-oyku") / "plan.json").write_text(json.dumps(plan))
+        mesajlar: list[str] = []
+        s = self.kontrol(lambda d, k: {"b1.wav": "Bir iki üç.", "b2.wav": "Dört beş."}[d.name], mesajlar.append)
+        self.assertEqual(mesajlar, ["[1/3] 1.000", "[2/3] 1.000"])
+        self.assertEqual([b.no for b in s.bloklar], [1, 2])
+        onbellek = json.loads((self.y.parcalar / "yazidokum.json").read_text())
+        boy = {n: (self.y.parcalar / f"b{n}.wav").stat().st_size for n in (1, 2)}
+        self.assertEqual(onbellek, {f"b1.wav|{boy[1]}": "Bir iki üç.", f"b2.wav|{boy[2]}": "Dört beş."})
+        S.wav_yaz(self.y.parcalar / "b1.wav", ses(1.3))  # blok yeniden okundu: boyu değişti, yeniden dinlenir
+        cagri: list[str] = []
+        self.kontrol(lambda d, k: (cagri.append(d.name), "Bir iki üç.")[1])
+        self.assertEqual(cagri, ["b1.wav"])
+
+    def test_toplam_eslesme_harf_agirlikli_blok_raporu_alanlari(self):
+        self.okunmus(["Bir iki.", "Üç dört beş altı yedi sekiz dokuz on."])
+        s = self.kontrol(lambda d, k: {"b1.wav": "Bir.", "b2.wav": "Üç dört beş altı yedi sekiz dokuz on."}[d.name])
+        b1 = s.bloklar[0]
+        self.assertEqual((b1.metin, b1.duyulan, b1.kapsama), ("Bir iki.", "Bir.", 0.5))
+        self.assertEqual(b1.oran, round(2 * 3 / (6 + 3), 3))
+        from sesli.karsilastir import harf_eslesmesi
+        _, e1, h1 = harf_eslesmesi("Bir iki.", "Bir.")
+        _, e2, h2 = harf_eslesmesi(*[b.metin for b in s.bloklar[1:]] * 2)
+        self.assertEqual((e1, h1, e2, h2), (3, 6, 29, 29))
+        self.assertAlmostEqual(s.eslesme, 100 * (e1 + e2) / (h1 + h2), msg="blok ortalaması değil, harf ağırlıklı")
+
+    def test_ikinci_dinleme_yalniz_uzun_ve_eksik_duyulan_blokta(self):
+        kisa = "Bir iki üç dört beş altı yedi sekiz."  # 8 kelime: ikinci dinleme yok
+        uzun = "Bir iki üç dört beş altı yedi sekiz dokuz."
+        for metin, duyulan, beklenen in ((kisa, "Bir iki.", [False]), (uzun, uzun, [False]),
+                                         (uzun, "Bir iki üç dört beş altı yedi.", [False, True])):
+            with self.subTest(metin=metin, duyulan=duyulan):
+                self.setUp()
+                self.okunmus([metin])
+                kipler: list[bool] = []
+                self.kontrol(lambda d, k: (kipler.append(k), duyulan)[1])
+                self.assertEqual(kipler, beklenen)
+
+    def test_ikinci_dinleme_iyiyse_kalici_kotuyse_ilki_kalir(self):
+        metin = "Bir gün yaşlı adam denize açıldı ve uzun süre balık tuttu sonra evine döndü."
+        for ikinci, iyi_mi in ((metin, True), ("Bir.", False)):
+            with self.subTest(iyi_mi=iyi_mi):
+                self.setUp()
+                self.okunmus([metin])
+                s = self.kontrol(lambda d, k: ikinci if k else "Bir gün yaşlı adam evine döndü.")
+                self.assertEqual(s.bloklar[0].duyulan, ikinci if iyi_mi else "Bir gün yaşlı adam evine döndü.")
+                cagri: list[bool] = []
+                self.kontrol(lambda d, k: (cagri.append(k), "x")[1])
+                self.assertEqual(cagri, [], "iki kip de önbellekte: yeniden dinlenmez")
+                self.assertEqual(self.kontrol(lambda d, k: "x").bloklar[0].duyulan, s.bloklar[0].duyulan)
+
+
 class TeslimTesti(GeciciKokTesti):
     def hazir_okuma(self, gecti=True, bozuk=False, motor="Gemini 3.8 Flash Lite TTS"):
         fola = self.y.fola_klasoru("kisa-oyku")
