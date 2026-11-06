@@ -162,6 +162,39 @@ class YayinTesti(YayinTabani):
         self.assertFalse(eski & yeni)
 
 
+class KodlamaTesti(GeciciKokTesti):
+    """Yayın için yeniden kodlama ve bölme (yayında ayrı süreçte çalışır; burada doğrudan sınanır)."""
+
+    def test_kodla_suresi_korunur_64kbps_tek_kanal(self):
+        mp3 = self.kok / "kaynak.mp3"
+        S.mp3_yaz(mp3, ses(3.0))
+        veri, saniye = site.kodla(mp3)
+        self.assertAlmostEqual(saniye, 3.0, delta=0.06)
+        cer = site.cerceveler(veri)
+        self.assertGreater(len(cer), 10)
+        self.assertEqual({c.hz for c in cer}, {S.SR})
+        b2, b3 = veri[cer[1].bas + 2], veri[cer[1].bas + 3]
+        self.assertEqual(site._BIT[2][b2 >> 4], site.KBPS, "64 kbps")
+        self.assertEqual(b3 >> 6, 3, "tek kanal")
+
+    def test_parcala_bilgi_dosyasini_en_son_yazar(self):
+        mp3 = self.kok / "01 - Eser - Yazar.mp3"
+        S.mp3_yaz(mp3, ses(4.0))
+        satir = site.parcala(mp3, self.kok / "p")
+        bilgi = json.loads((self.kok / "p" / "bilgi.json").read_text())
+        self.assertEqual(satir, f"{site.KBPS} kbps, bölündü: {mp3.name} → {len(bilgi['sureler'])} parça")
+        self.assertEqual(bilgi["boyut"], sum(p.stat().st_size for p in (self.kok / "p").glob("*.mp3")))
+        self.assertAlmostEqual(sum(bilgi["sureler"]), 4.0, delta=site.SURE_TOLERANSI)
+
+    def test_sure_tutmazsa_klasor_silinir_yayin_durur(self):
+        mp3 = self.kok / "a.mp3"
+        S.mp3_yaz(mp3, ses(2.0))
+        with mock.patch.object(site, "bol", lambda veri, k: (k.mkdir(), [0.4])[1]), \
+             self.assertRaisesRegex(site.SiteHatasi, r"parçaların süresi tutmuyor: a\.mp3 0\.4 != 2\.[01]$"):
+            site.parcala(mp3, self.kok / "p")
+        self.assertFalse((self.kok / "p").exists(), "yarım klasör kalmaz")
+
+
 class KatalogKaydiTesti(YayinTabani):
     """Sitenin gösterdiği her şey katalog.json ve yakinda.json'dan gelir: kayıtlar eksiksiz ve doğru olmalı."""
 
