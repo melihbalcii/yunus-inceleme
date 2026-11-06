@@ -158,5 +158,40 @@ class DurumDeposuTesti(GeciciKokTesti):
         self.assertEqual((depo.oku().atama, depo.oku().ortak), ({}, {}))
 
 
+class DurumAyrintiTesti(GeciciKokTesti):
+    def test_kilit_dosyasinin_adi_sabit(self):
+        """Çalışan eski program ile yeni program aynı kilidi görmeli; ad değişirse ikisi aynı anda yazar."""
+        d = DurumDeposu(self.y.durum)
+        self.assertEqual(d._kilit, self.y.tmp / "fola-atama.json.kilit")
+
+    def test_bilinen_alanlar_degisince_eski_degeri_ezmez(self):
+        self.y.durum.write_text(json.dumps({"atama": {"a": "m"}, "ortak": {"a": ["n"]}, "ret": {"m": ["b"]},
+                                            "yontem": {"a": "sabit"}, "onarim": {"a": 1}, "oncelik": ["a"],
+                                            "elle": 5}), encoding="utf-8")
+        depo = DurumDeposu(self.y.durum)
+        with depo.degistir() as d:
+            d.yontem["a"] = "uyarlamali"
+            d.onarim["a"] = 2
+            d.oncelik.append("c")
+        v = json.loads(self.y.durum.read_text(encoding="utf-8"))
+        self.assertEqual((v["yontem"], v["onarim"], v["oncelik"], v["elle"]), ({"a": "uyarlamali"}, {"a": 2}, ["a", "c"], 5))
+
+    def test_eksik_alanlar_bos_baslar(self):
+        from sesli.durum import Durum
+        d = Durum.sozlukten({})
+        self.assertEqual((d.atama, d.ortak, d.ret, d.yontem, d.onarim, d.oncelik), ({}, {}, {}, {}, {}, []))
+
+    def test_okuyabilir_mi_ve_bitir(self):
+        from sesli.durum import Durum
+        d = Durum(atama={"a": "m"}, ortak={"a": ["n"]})
+        self.assertTrue(d.okuyabilir_mi("m", "a"))
+        self.assertTrue(d.okuyabilir_mi("n", "a"))
+        self.assertFalse(d.okuyabilir_mi("k", "a"))
+        self.assertFalse(d.okuyabilir_mi("m", "b"))
+        d.bitir("yok")  # olmayan eser sorun çıkarmaz
+        d.bitir("a")
+        self.assertEqual((d.atama, d.ortak), ({}, {}))
+
+
 if __name__ == "__main__":
     unittest.main()
