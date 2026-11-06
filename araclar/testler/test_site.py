@@ -237,6 +237,42 @@ class KatalogKaydiTesti(YayinTabani):
              "okunuyor": False}])
 
 
+class YayinKapilariTesti(YayinTabani):
+    """Yayının kapıları: özet satırları, 10 MB sınırı, listede olmayan ya da vazgeçilen eser."""
+
+    def test_ozet_satirlari(self):
+        self.kur()
+        mesajlar: list[str] = []
+        katalog, _ = site.hazirla(self.y, bildir=mesajlar.append)
+        k = katalog[0]
+        self.assertIn("1 eser Yakında rafında", mesajlar)
+        self.assertEqual(mesajlar[-1], f"1 eser, {len(k['parcalar'])} parça, {round(k['sure'] / 3600, 1)} saat, "
+                                       f"{k['boyut'] / 1e9:.2f} GB → {self.y.yayin}")
+        self.assertTrue(any(m.startswith(f"{site.KBPS} kbps, bölündü: 01 - Kısa Öykü") for m in mesajlar))
+
+    def test_10_mb_asan_parca_yayini_durdurur(self):
+        self.kur()
+        site.hazirla(self.y, bildir=lambda s: None)
+        parca = next((self.y.yayin / "ses").rglob("1.mp3"))
+        parca.write_bytes(b"x" * (site.NETLIFY_SINIRI + 1))
+        with self.assertRaisesRegex(site.SiteHatasi, "10 MB'ı aşan parça var"):
+            site.hazirla(self.y, bildir=lambda s: None)
+        parca.write_bytes(b"x" * site.NETLIFY_SINIRI)
+        site.hazirla(self.y, bildir=lambda s: None)  # tam sınır geçer
+
+    def test_vazgecilen_eser_yayina_alinmaz_listede_olmayan_hata(self):
+        from sesli.katalog import KatalogHatasi
+        self.kur()
+        k = self.y.teslim / "Gemini 3.8 Flash"
+        S.mp3_yaz(k / "04 - Bırakılan - Yazar Dört.mp3", ses(0.5))
+        mesajlar: list[str] = []
+        katalog, _ = site.hazirla(self.y, bildir=mesajlar.append, kuru=True)
+        self.assertIn("siteye alınmadı (vazgecildi): 04 - Bırakılan - Yazar Dört.mp3", mesajlar)
+        S.mp3_yaz(k / "99 - Bilinmeyen - Kimse.mp3", ses(0.5))
+        with self.assertRaisesRegex(KatalogHatasi, "eser listesinde karşılığı yok: 99 - Bilinmeyen - Kimse.mp3"):
+            site.hazirla(self.y, bildir=lambda s: None, kuru=True)
+
+
 class OzetOnbellegiTesti(GeciciKokTesti):
     def test_ozet_dosya_degismedikce_yeniden_okunmaz_degisince_degisir(self):
         mp3, kayit = self.kok / "a.mp3", self.kok / "ozetler.json"
