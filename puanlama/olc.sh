@@ -95,7 +95,9 @@ fi
 if adim mutmut; then
   baslik "mutmut (uzun sürer)"
   rm -rf mutants
-  "$PY" -m mutmut run > "$S/mutmut-gunluk.txt" 2>&1 || true
+  # NO_PROXY: macOS'ta çatallanmış test süreci sistem vekil ayarını sorgularken çöküyor (segfault); bu, yakalanan
+  # mutasyonu "yakalanmadı" saydırıyordu (kalite/HATA-DEFTERI.md H-019). Ortam değişkeni varsa sorgu yapılmaz.
+  NO_PROXY='*' "$PY" -m mutmut run > "$S/mutmut-gunluk.txt" 2>&1 || true
   "$PY" -m mutmut export-cicd-stats >/dev/null 2>&1 && cp mutants/mutmut-cicd-stats.json "$S/mutmut.json"
 fi
 

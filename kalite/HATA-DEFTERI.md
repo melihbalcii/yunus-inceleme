@@ -141,3 +141,12 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
   çökme olursa ses kayboluyor, kota boşa gidiyor, ertesi açılışta aynı blok yeniden isteniyordu.
 - **Düzeltme:** Ses gelir gelmez "bekleyen" olarak diske yazılır; açılışta önce bekleyenler ölçülür, yeni istek atılmaz.
 - **Tür denetimi:** çökme testi (ölçüm anında öldürme). **Durum:** Düzeltildi.
+
+### H-019 · Mutasyon ölçümü 208 yakalanan mutasyonu "yakalanmadı" sayıyordu
+- **Bulan:** Biz (mutasyon sonuçlarını modül modül incelerken), 6 Kasım 2026 · **Tür:** Ölçüm hatası (S2)
+- **Kök neden:** mutmut her mutasyonu çatallanmış (fork) süreçte sınar. macOS'ta çatallanmış süreç, ağ kütüphanesi
+  (httpx/urllib) sistemin vekil sunucu ayarını sorguladığında çöküyor (segfault). Ağ kullanan testler bu yüzden
+  başarısız olmak yerine çöktü; mutmut çökmeyi "yakalandı" saymıyor. `gemini.py`'nin puanı %46 görünüyordu.
+- **Düzeltme:** Ölçümde `NO_PROXY='*'`: vekil sorgusu yapılmaz. Tek tek doğrulandı: çöken mutasyonlar testlerce yakalanıyor.
+- **Ayrıca:** Ağ testi, öldürülünce Toxiproxy sürecini açık bırakıyordu (bir ölçümde 207 süreç). Toxiproxy artık bekçi
+  kabukla başlıyor; `kill -9` sonrası da kapandığı doğrulandı. **Durum:** Düzeltildi.

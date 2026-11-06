@@ -81,8 +81,11 @@ class AgKopmasiTesti(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.api_port, cls.vekil_port = _bos_port(), _bos_port()
-        cls.toxi = subprocess.Popen([str(_sunucu_yolu()), "-host", "127.0.0.1", "-port", str(cls.api_port)],
-                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Bekçi kabuk: test süreci nasıl ölürse ölsün (mutasyon testinin zaman aşımı, kill -9) stdin kapanır,
+        # `read` döner ve Toxiproxy kapatılır. Yoksa öldürülen her test bir Toxiproxy süreci bırakıyordu.
+        cls.toxi = subprocess.Popen(
+            ["/bin/sh", "-c", '"$0" -host 127.0.0.1 -port "$1" >/dev/null 2>&1 & p=$!; read _; kill $p',
+             str(_sunucu_yolu()), str(cls.api_port)], stdin=subprocess.PIPE)
         cls.api = httpx.Client(base_url=f"http://127.0.0.1:{cls.api_port}", timeout=5)
         for _ in range(100):
             try:
@@ -97,7 +100,8 @@ class AgKopmasiTesti(unittest.TestCase):
     def tearDownClass(cls) -> None:
         cls.gemini.shutdown()
         cls.api.close()
-        cls.toxi.terminate()
+        assert cls.toxi.stdin is not None
+        cls.toxi.stdin.close()
         cls.toxi.wait(5)
 
     def setUp(self) -> None:
