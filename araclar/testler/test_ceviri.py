@@ -70,5 +70,29 @@ class BirlestirmeTesti(GeciciKokTesti):
         self.assertTrue((self.y.eser_klasoru("ceviri-eseri") / "ceviri.txt").exists())
 
 
+class CeviriAyariTesti(GeciciKokTesti):
+    def test_varsayilanlar_ve_eksik_alan(self):
+        d = self.kok / "ceviri.json"
+        d.write_text(json.dumps({"bolum_sayisi": "2", "giris": "G.", "kapanis": ["K1.", "K2."]}), encoding="utf-8")
+        a = C.CeviriAyari.oku(d)
+        self.assertEqual((a.bolum_sayisi, a.giris, a.kapanis, a.okunus, a.ceviri_basligi), (2, "G.", ("K1.", "K2."), (), ""))
+        for icerik in ("{bozuk", json.dumps({"giris": "G.", "kapanis": []}), json.dumps({"bolum_sayisi": "iki",
+                       "giris": "G.", "kapanis": []}), json.dumps({"bolum_sayisi": 1, "giris": "G.", "kapanis": [],
+                       "okunus": [["tek"]]})):
+            d.write_text(icerik, encoding="utf-8")
+            with self.subTest(icerik=icerik), self.assertRaises(C.CeviriHatasi):
+                C.CeviriAyari.oku(d)
+        with self.assertRaises(C.CeviriHatasi):
+            C.CeviriAyari.oku(self.kok / "yok.json")
+
+    def test_basliksiz_ceviri_ve_yumusak_tire(self):
+        k = self.kok / "e"
+        (k / "tr").mkdir(parents=True)
+        (k / "tr" / "01.md").write_text("Bir\xadlikte.\n\nİki.", encoding="utf-8")
+        ceviri, ses = C.birlestir(k, C.CeviriAyari(1, "Giriş.", ("K1.", "K2."), ()))
+        self.assertEqual(ceviri, "Bir\xadlikte.\n\nİki.\n")
+        self.assertEqual(ses, "Giriş.\n\nBirlikte.\n\nİki.\n\nK1.\n\nK2.\n")
+
+
 if __name__ == "__main__":
     unittest.main()
