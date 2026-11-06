@@ -7,7 +7,7 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
 
 | Ay | Bizden önce başkasının bulduğu | Araçların bulduğu | Bizim bulduğumuz |
 |---|---|---|---|
-| Kasım 2026 | 1 (Yunus: H-001) | 11 (H-004…H-012, H-014, H-015) | 6 (H-002, H-003, H-013, H-016, H-017, H-018) |
+| Kasım 2026 | 1 (Yunus: H-001) | 11 (H-004…H-012, H-014, H-015) | 8 (H-002, H-003, H-013, H-016…H-020) |
 
 ## Kayıtlar
 
@@ -154,3 +154,14 @@ sorunun cevabı vardır: "Bu türden bir hata tekrar olursa onu otomatik olarak 
 - **Düzeltme:** Ölçümde `NO_PROXY='*'`: vekil sorgusu yapılmaz. Tek tek doğrulandı: çöken mutasyonlar testlerce yakalanıyor.
 - **Ayrıca:** Ağ testi, öldürülünce Toxiproxy sürecini açık bırakıyordu (bir ölçümde 207 süreç). Toxiproxy artık bekçi
   kabukla başlıyor; `kill -9` sonrası da kapandığı doğrulandı. **Durum:** Düzeltildi.
+
+### H-020 · Kayıt denetiminin iki yanlış alarmı (ilk canlı gece)
+- **Bulan:** Biz (6 Kasım gecesi okumanın denetimini incelerken) · **Tür:** Ölçüm/denetim hatası
+- **1) "İki okuma programı kopyası":** Mac'i uyutmayan `caffeinate` sarmalayıcısının komut satırında da "sesli_kitap.py oku"
+  geçiyordu; kopya sayıldı. Artık sayılmıyor (test: `SurecVeTekrarTesti`).
+- **2) "Aynı metin birden çok kez seslendirildi":** Bulunan 4 metnin hepsi tasarım gereği yeniden okumaydı (atlama ya da
+  "ses bozuluyor" yüzünden 2-3 deneme; günlükte görüldü). Artık 3 denemeye kadar bilgi olarak, fazlası alarm olarak yazılır.
+- **3) Rapor üzerine yazılıyordu:** gün içinde ikinci denetim ilkinin bulgularını siliyordu; artık eklenir.
+- **Canlı doğrulama (aynı gece):** Gemini 503 "yoğunluk" yanıtlarında (1-2 sn'de dönen ret) kod en çok 2 deneyip 10 dk
+  bekledi; blok başına günlük tavan (4) dolunca 03:26'da 5. isteği hiç atmadı; Flash'ı dinlenmeye aldı; yeni kodla
+  başlayınca canlı alarm (bugün 5 boşa istek ≥ 4) okumayı kota yenilenene dek durdurdu. **Durum:** Düzeltildi.
