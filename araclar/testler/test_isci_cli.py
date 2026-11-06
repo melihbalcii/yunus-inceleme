@@ -87,6 +87,32 @@ class BasariliOkumaTesti(GeciciKokTesti):
                          {"motor": "Gemini 3.8 Flash TTS", "model": "m", "ses": "Fola"})
         self.assertIn("kontrol: eşleşme %98.50, 0,90 altı 0, atlama 0\n", cikti)
 
+    def test_siir_ve_sabit_blok_ayarlari_okumaya_gecer_motor_kaydi_utf8(self):
+        from testler.yardim import ORNEK_ESERLER
+        self.eser_listesi_yaz([{**ORNEK_ESERLER[0], "siir": True}, *ORNEK_ESERLER[1:]])
+        from unittest import mock
+        from sesli import isci
+        from sesli.kontrol import KontrolSonucu
+        self.metin_yaz("kisa-oyku", ["Bir dize\nikinci dize."])
+        ayarlar, araclar = [], []
+        gercek = isci.Okuyucu
+
+        def okuyucu(tts, ayar, yollar, **k):
+            ayarlar.append(ayar)
+            return gercek(tts, ayar, yollar, olc=lambda m, s: (1.0, []), kalite=lambda s: (3.6, 3.5),
+                          yamala=lambda *a, **kw: None, **k)
+        with mock.patch.object(isci, "Okuyucu", okuyucu), \
+             mock.patch.object(isci, "kontrol_et", lambda f, p, bildir: KontrolSonucu(99.0, [])), \
+             contextlib.redirect_stdout(io.StringIO()):
+            kod = oku_eser(_is(arac_adi="Gemini 3.1 Flash TTS", ses="Sulafat", hedef_sn=None, sabit_blok=2000,
+                               ortak=()), self.y,
+                           tts_kur=lambda arac, y, b: (araclar.append(arac), SahteTTS())[1])
+        self.assertIs(kod, Cikis.TAMAM)
+        self.assertEqual((ayarlar[0].siir, ayarlar[0].sabit_blok, ayarlar[0].hedef_sn), (True, 2000, None))
+        self.assertEqual(araclar[0].sabit_blok, 2000)
+        motor = (self.y.fola_klasoru("kisa-oyku") / "motor.json").read_text(encoding="utf-8")
+        self.assertEqual(json.loads(motor), {"motor": "Gemini 3.1 Flash TTS", "model": "m", "ses": "Sulafat"})
+
     def test_kontrolden_gecmeyen_okuma_gunlukte_belirtilir(self):
         _, cikti = self.calistir((95.0, 0.85, ["atlanan"]))
         self.assertIn("kontrol: eşleşme %95.00, 0,90 altı 1, atlama 1 — GEÇMEDİ\n", cikti)
