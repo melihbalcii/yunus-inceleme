@@ -152,5 +152,49 @@ class HazirlikTesti(GeciciKokTesti):
         self.assertEqual(d.read_text(encoding="utf-8"), "Eser. Yazar.\n\nA.\n\nB.\n\nEser'i dinlediniz.\n")
 
 
+class KontrolSonucuTesti(GeciciKokTesti):
+    """Teslimin son kapısı: eşikler sınır değerlerde doğru, kayıt okunup yazılınca aynı kalır."""
+
+    def blok(self, no, oran, atlama=(), kapsama=1.0, metin="metin", duyulan="duyulan"):
+        from sesli.kontrol import BlokRaporu
+        return BlokRaporu(no=no, oran=oran, kapsama=kapsama, metin=metin, duyulan=duyulan, atlama=list(atlama))
+
+    def test_gecme_esikleri_sinirda(self):
+        self.assertTrue(KontrolSonucu(97.0, [self.blok(1, 0.90)]).gecti, "97,00 ve 0,90 tam eşik: geçer")
+        self.assertFalse(KontrolSonucu(96.99, [self.blok(1, 0.99)]).gecti)
+        self.assertFalse(KontrolSonucu(99.0, [self.blok(1, 0.899)]).gecti)
+        self.assertFalse(KontrolSonucu(99.0, [self.blok(1, 0.99, ["atlanan"])]).gecti)
+        self.assertTrue(KontrolSonucu(99.0, []).gecti)
+
+    def test_sorunlu_bloklar_ve_sayimlar(self):
+        k = KontrolSonucu(98.0, [self.blok(1, 0.99), self.blok(2, 0.85), self.blok(3, 0.97, ["a", "b"]),
+                                 self.blok(4, 0.92)])
+        self.assertEqual(k.sorunlu_bloklar(), [2, 3])
+        self.assertEqual(k.dusuk, 1)
+        self.assertEqual(k.atlamalar, [(3, "a"), (3, "b")])
+
+    def test_yazilip_okununca_ayni_kalir_ozet_dosyasi_yazilir(self):
+        k = KontrolSonucu(98.456, [self.blok(1, 0.93, ["atlanan söz"], kapsama=0.8, metin="m" * 300, duyulan="d"),
+                                   self.blok(2, 0.99)])
+        k.yaz(self.kok)
+        veri = json.loads((self.kok / "kontrol.json").read_text())
+        self.assertEqual((veri["eslesme"], veri["gecti"]), (98.46, False))
+        geri = KontrolSonucu.oku(self.kok)
+        assert geri is not None
+        self.assertEqual((geri.eslesme, geri.bloklar), (98.46, k.bloklar))
+        ozet = (self.kok / "kontrol.txt").read_text()
+        for parca in ("[1/2] 0.930", "PARAGRAF 2 | harf düzeyinde eşleşme %98.46", "0,95 altı: 1 | 0,90 altı: 0",
+                      "ATLAMA #1: «atlanan söz»", "KAPSAMA DÜŞÜK #1 %80", "- #1 0.930\n  metin  : " + "m" * 200 + "\n"):
+            self.assertIn(parca, ozet)
+        self.assertNotIn("KAPSAMA DÜŞÜK #2", ozet)
+        self.assertNotIn("m" * 201, ozet, "uzun metin 200 harfte kesilir")
+
+    def test_bozuk_ya_da_eksik_kayit_none(self):
+        self.assertIsNone(KontrolSonucu.oku(self.kok))
+        for icerik in ("{bozuk", '{"bloklar": []}', '{"eslesme": 99, "bloklar": [{"no": 1}]}', '{"eslesme": "yok"}'):
+            (self.kok / "kontrol.json").write_text(icerik)
+            self.assertIsNone(KontrolSonucu.oku(self.kok), icerik)
+
+
 if __name__ == "__main__":
     unittest.main()
